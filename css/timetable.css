@@ -1,0 +1,66 @@
+/* Timetable Module Styling */
+
+.timetable-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+}
+
+.timetable-day-col {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+}
+
+.timetable-day-header {
+    font-family: var(--font-heading);
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border-glass);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.timetable-day-header.today {
+    color: var(--primary-cyan);
+}
+
+.timetable-slot-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    margin-bottom: 10px;
+    position: relative;
+    border-left: 3px solid var(--slot-color, var(--primary-cyan));
+}
+
+.slot-time {
+    font-size: 11px;
+    color: var(--primary-cyan);
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.slot-subject {
+    font-weight: 600;
+    font-size: 13px;
+    color: white;
+    margin-bottom: 2px;
+}
+
+.slot-room {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+@media (max-width: 1024px) {
+    .timetable-grid {
+        grid-template-columns: 1fr;
+    }
+}
