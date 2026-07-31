@@ -7,45 +7,49 @@ import { UIController } from './ui.js';
 import { Storage } from './storage.js';
 import { DataMigration } from './migration.js';
 
-// Run Data Migration if needed
 DataMigration.runIfNeeded();
-
-// 1. Instantly attach UIController to window so all button clicks work immediately
 window.appUI = UIController;
 window.appStorage = Storage;
 
-// 2. Initialize UI immediately
+function loadMobileStyles() {
+    if (document.querySelector('link[href="css/mobile.css"]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'css/mobile.css';
+    document.head.appendChild(link);
+}
+
+function enhanceAccessibility() {
+    document.querySelectorAll('button, input, select, textarea').forEach(control => {
+        if (!control.getAttribute('aria-label') && control.title) control.setAttribute('aria-label', control.title);
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') document.querySelector('.modal-overlay.active .modal-close')?.click();
+    });
+}
+
+loadMobileStyles();
 try {
     UIController.init();
+    enhanceAccessibility();
     console.log('✨ AuraLife Core UI initialized successfully.');
 } catch (e) {
     console.error('Error initializing UIController:', e);
 }
 
-// 3. Asynchronously load Cloud Sync in background (will never block core UI)
 async function loadCloudServices() {
     try {
         const { CloudStorage } = await import('./cloud-storage.js');
         const { AuthUI } = await import('./auth-ui.js');
-
         window.appCloud = CloudStorage;
-
-        // Global helpers for debugging
         window.syncNow = () => CloudStorage.syncAllDataToCloud();
         window.diagnoseFirebase = () => CloudStorage._diagnose();
-
-        AuthUI.init(() => {
-            UIController.renderAll();
-        });
+        AuthUI.init(() => UIController.renderAll());
         console.log('☁️ Cloud Sync Services Loaded.');
     } catch (err) {
         console.warn('Running in Local Mode (Cloud modules deferred):', err);
     }
 }
 
-// Load cloud services after page load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadCloudServices);
-} else {
-    loadCloudServices();
-}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadCloudServices);
+else loadCloudServices();
