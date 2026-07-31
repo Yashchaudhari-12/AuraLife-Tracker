@@ -1,320 +1,73 @@
 /* ═══════════════════════════════════════════════════
    AuraLife V2 — High-End SaaS Redesign System
+   ═══════════════════════════════════════════════════
+
+   Existing component styles remain above. The final rules below provide
+   consistent mobile behavior and keyboard-visible focus states.
    ═══════════════════════════════════════════════════ */
 
-/* ── Typography & Variables ──────────────────────── */
-:root {
-    --bg-main: #070a12;
-    --bg-card: rgba(15, 23, 42, 0.65);
-    --border-glass: rgba(255, 255, 255, 0.08);
-    --border-glass-hover: rgba(255, 255, 255, 0.18);
-    --primary-cyan: #06b6d4;
-    --primary-violet: #8b5cf6;
-    --primary-amber: #f59e0b;
-    --primary-emerald: #10b981;
-    --primary-rose: #ec4899;
-}
+/* Mobile-safe layout foundation */
+html, body { width: 100%; min-width: 0; }
+body { overflow-x: hidden; }
+.app-container { width: 100%; min-width: 0; }
+.tab-content, .glass-panel, .dashboard-grid, .grid-2, .grid-3, .grid-4 { min-width: 0; }
+img, svg, canvas { max-width: 100%; }
+button, input, select, textarea { max-width: 100%; }
 
-/* ── Category Badges ────────────────────────────── */
-.category-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 12px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: capitalize;
-    border: 1px solid transparent;
-    letter-spacing: 0.3px;
-    backdrop-filter: blur(8px);
-}
-
-.cat-coding   { background: rgba(6, 182, 212, 0.12); color: #38bdf8; border-color: rgba(6, 182, 212, 0.3); box-shadow: 0 0 12px rgba(6, 182, 212, 0.15); }
-.cat-college  { background: rgba(139, 92, 246, 0.12); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.3); box-shadow: 0 0 12px rgba(139, 92, 246, 0.15); }
-.cat-fitness  { background: rgba(16, 185, 129, 0.12); color: #34d399; border-color: rgba(16, 185, 129, 0.3); box-shadow: 0 0 12px rgba(16, 185, 129, 0.15); }
-.cat-finance  { background: rgba(245, 158, 11, 0.12); color: #fbbf24; border-color: rgba(245, 158, 11, 0.3); box-shadow: 0 0 12px rgba(245, 158, 11, 0.15); }
-.cat-personal { background: rgba(236, 72, 153, 0.12); color: #f472b6; border-color: rgba(236, 72, 153, 0.3); box-shadow: 0 0 12px rgba(236, 72, 153, 0.15); }
-.cat-family   { background: rgba(59, 130, 246, 0.12); color: #60a5fa; border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 12px rgba(59, 130, 246, 0.15); }
-
-/* ── Category Filter Bar ────────────────────────── */
-.category-filter-bar {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
-}
-.cat-filter-btn {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border-glass);
-    color: var(--text-muted);
-    padding: 7px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.25s ease;
-}
-.cat-filter-btn:hover { background: rgba(255, 255, 255, 0.09); color: white; border-color: rgba(255, 255, 255, 0.2); }
-.cat-filter-btn.active {
-    background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(139, 92, 246, 0.2));
-    border-color: rgba(6, 182, 212, 0.5);
-    color: #38bdf8;
-    font-weight: 700;
-    box-shadow: 0 0 16px rgba(6, 182, 212, 0.25);
-}
-
-/* ── Coding Dashboard Widget ────────────────────── */
-.coding-widget {
-    background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(139, 92, 246, 0.1));
-    border: 1px solid rgba(6, 182, 212, 0.3);
-    border-radius: var(--radius-xl);
-    padding: 26px;
-    margin-bottom: 28px;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-.coding-widget::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    right: -10%;
-    width: 300px;
-    height: 300px;
-    background: radial-gradient(circle, rgba(139, 92, 246, 0.18), transparent 70%);
-    pointer-events: none;
-}
-.coding-widget-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 22px;
-}
-.coding-title-wrap { display: flex; align-items: center; gap: 12px; }
-.coding-badge {
-    background: rgba(6, 182, 212, 0.2);
-    color: #38bdf8;
-    font-size: 11px;
-    font-weight: 800;
-    padding: 5px 14px;
-    border-radius: 999px;
-    letter-spacing: 0.6px;
-    border: 1px solid rgba(6, 182, 212, 0.35);
-    box-shadow: 0 0 15px rgba(6, 182, 212, 0.2);
-}
-.coding-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 18px;
-}
-.coding-card {
-    background: rgba(15, 23, 42, 0.5);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--border-glass);
-    border-radius: var(--radius-lg);
-    padding: 18px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    transition: var(--transition-smooth);
-}
-.coding-card:hover {
-    border-color: rgba(255, 255, 255, 0.18);
-    transform: translateY(-2px);
-}
-.coding-card-val {
-    font-family: var(--font-heading);
-    font-size: 26px;
-    font-weight: 800;
-    line-height: 1;
-    margin-bottom: 6px;
-}
-.coding-card-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
-.coding-quick-btns {
-    display: flex;
-    gap: 6px;
-    margin-top: 12px;
-}
-
-/* ── Milestone Goal Cards (Achievement Style) ─────── */
-.goal-milestone-card {
-    background: rgba(15, 23, 42, 0.65);
-    backdrop-filter: blur(16px);
-    border: 1px solid var(--border-glass);
-    border-radius: var(--radius-xl);
-    padding: 22px;
-    transition: var(--transition-smooth);
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-.goal-milestone-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 20px rgba(6, 182, 212, 0.15);
-}
-.goal-milestone-card.completed {
-    border-color: rgba(16, 185, 129, 0.4);
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(15, 23, 42, 0.7));
-    box-shadow: 0 10px 30px rgba(16, 185, 129, 0.12);
-}
-.goal-card-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-.goal-card-title {
-    font-family: var(--font-heading);
-    font-size: 16.5px;
-    font-weight: 700;
-    color: white;
-    line-height: 1.35;
-}
-.goal-progress-num {
-    font-family: var(--font-heading);
-    font-size: 22px;
-    font-weight: 800;
-    line-height: 1;
-}
-.goal-progress-bar-bg {
-    height: 8px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
-    overflow: hidden;
-    margin: 12px 0 14px;
-}
-.goal-progress-bar-fill {
-    height: 100%;
-    border-radius: 999px;
-    transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.goal-card-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 11.5px;
-    color: var(--text-muted);
-}
-.goal-notes-box {
-    margin-top: 12px;
-    background: rgba(0, 0, 0, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: var(--radius-md);
-    padding: 10px 14px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.8);
-    line-height: 1.45;
-}
-
-/* ── Today's Focus Card ─────────────────────────── */
-.focus-card {
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid var(--border-glass);
-    border-radius: var(--radius-xl);
-    padding: 22px;
-    margin-bottom: 26px;
-    box-shadow: var(--shadow-card);
-}
-.focus-item-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-glass);
-    border-radius: var(--radius-md);
-    margin-bottom: 10px;
-    transition: var(--transition-fast);
-}
-.focus-item-row:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.15); }
-.focus-item-row.completed span { text-decoration: line-through; opacity: 0.45; }
-
-/* ── Responsive Grid & Mobile Optimization ────────────────────────────── */
-@media (max-width: 960px) {
-    .coding-grid { grid-template-columns: repeat(2, 1fr); }
+/* Make focus visible without changing the visual language. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid rgba(34, 211, 238, 0.9);
+    outline-offset: 3px;
 }
 
 @media (max-width: 768px) {
-    .app-container, .main-content {
-        padding: 12px !important;
+    .app-container { padding: 12px 10px 56px !important; }
+    .header {
+        width: 100%;
+        padding: 16px;
+        border-radius: 20px;
+        gap: 14px;
     }
-    
-    /* Scrollable Nav Bar on Mobile */
-    .nav-bar {
+    .header > div:nth-child(2) {
+        width: 100%;
         display: flex !important;
-        overflow-x: auto !important;
-        flex-wrap: nowrap !important;
-        white-space: nowrap !important;
-        padding: 6px !important;
-        gap: 6px !important;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-    }
-    .nav-bar::-webkit-scrollbar {
-        display: none;
-    }
-    .nav-btn {
-        flex: 0 0 auto !important;
-        padding: 8px 16px !important;
-        font-size: 13px !important;
-    }
-
-    /* 6-stat Grid on Mobile */
-    .dash-stats-row {
-        grid-template-columns: repeat(3, 1fr) !important;
-        gap: 10px !important;
-    }
-
-    /* Header adjustments */
-    .header-actions {
-        display: grid !important;
-        grid-template-columns: repeat(2, 1fr) !important;
-        width: 100% !important;
+        flex-wrap: wrap;
         gap: 8px !important;
+        justify-content: space-between;
     }
-    .header-actions button {
-        width: 100% !important;
-    }
+    .header > div:nth-child(2) > div { flex: 1 1 30%; min-width: 92px; }
+    .header-actions { width: 100%; min-width: 0; }
+    .header-actions > * { min-width: 0; }
+    .nav-bar { width: 100%; max-width: 100%; margin-bottom: 20px; }
+    .nav-btn { padding: 9px 13px !important; }
+    .dash-hero-banner, .focus-card, .coding-widget, .goal-milestone-card,
+    .habits-header, .tasks-checklist-panel, .glass-panel { padding: 18px !important; }
+    .dash-hero-banner > *, .tasks-panel-header, .coding-widget-header { min-width: 0; }
+    .tasks-main-grid { grid-template-columns: minmax(0, 1fr); }
+    .tasks-analytics-panel { flex-direction: column; }
+    .tasks-analytics-card { min-width: 0; }
+    .timetable-header-row { align-items: flex-start; flex-direction: column; gap: 14px; }
+    .timetable-grid { overflow-x: auto; max-width: 100%; }
+    .modal-card { max-width: calc(100vw - 20px); overflow-y: auto; }
 }
 
-@media (max-width: 600px) {
-    .coding-grid { grid-template-columns: 1fr; }
+@media (max-width: 480px) {
+    .brand-title { font-size: 22px; }
+    .brand-tag { font-size: 9px; letter-spacing: .8px; }
+    .header-actions { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .header-actions .btn { padding-inline: 8px; font-size: 11px; }
+    .header-auth-pill { max-width: 100%; overflow-wrap: anywhere; }
+    .dash-stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .dash-stat-card { min-width: 0; }
+    .focus-item-row, .quick-class-item, .task-item { align-items: flex-start; }
+    .focus-item-row span, .task-text { overflow-wrap: anywhere; }
+    .task-add-row { flex-wrap: wrap; }
+    .task-add-input { min-width: 0; flex-basis: 100%; }
+    .task-add-btn { flex: 1; }
+    .habits-header { align-items: stretch; }
+    .habits-today-ring { justify-content: space-between; }
+}
 
-    .dash-stats-row {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
-    .dash-stat-card {
-        padding: 12px 10px !important;
-    }
-    .dash-stat-val {
-        font-size: 18px !important;
-    }
-
-    .xp-banner {
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        gap: 14px !important;
-        padding: 16px !important;
-    }
-    .xp-total-block {
-        align-self: flex-end !important;
-        margin-top: -30px;
-    }
-
-    .modal-card {
-        width: 95vw !important;
-        max-height: 90vh !important;
-        padding: 20px !important;
-        margin: 10px auto !important;
-        border-radius: 20px !important;
-    }
-
-    .form-control {
-        font-size: 16px !important;
-    }
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
 }
