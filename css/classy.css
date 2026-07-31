@@ -1,0 +1,141 @@
+/* AuraLife Classy Theme — restrained midnight, indigo, and champagne accents. */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+
+:root {
+    --bg-dark: #0b0d17;
+    --bg-card: rgba(19, 23, 40, 0.88);
+    --bg-card-hover: rgba(26, 31, 52, 0.96);
+    --bg-glass: rgba(255, 255, 255, 0.035);
+    --border-glass: rgba(184, 193, 224, 0.13);
+    --border-glass-hover: rgba(184, 193, 224, 0.25);
+    --border-glow: rgba(132, 142, 255, 0.32);
+    --primary-cyan: #8b96ff;
+    --primary-violet: #b29cff;
+    --primary-emerald: #65c7a0;
+    --primary-amber: #e7bd72;
+    --primary-rose: #e78f9f;
+    --primary-pink: #d99aca;
+    --text-main: #f5f4f8;
+    --text-muted: #a7abc0;
+    --text-dim: #737991;
+    --font-heading: 'Manrope', 'Outfit', sans-serif;
+    --font-body: 'DM Sans', 'Inter', sans-serif;
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-xl: 24px;
+    --shadow-card: 0 18px 45px -24px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255,255,255,0.055);
+    --shadow-glow-cyan: 0 0 24px rgba(139, 150, 255, 0.14);
+    --shadow-glow-violet: 0 0 24px rgba(178, 156, 255, 0.14);
+}
+
+html { background: #0b0d17; }
+body {
+    background-color: #0b0d17;
+    background-image:
+        radial-gradient(circle at 8% 0%, rgba(89, 79, 160, 0.18), transparent 34%),
+        radial-gradient(circle at 92% 28%, rgba(51, 73, 137, 0.12), transparent 31%),
+        linear-gradient(180deg, #0e1020 0%, #0b0d17 60%);
+    letter-spacing: -0.15px;
+}
+
+.app-container { max-width: 1380px; padding-top: 28px; }
+.header {
+    background: rgba(17, 21, 37, 0.82);
+    border-color: rgba(184, 193, 224, 0.14);
+    border-radius: 22px;
+    box-shadow: var(--shadow-card);
+}
+.header:hover { border-color: rgba(184, 193, 224, 0.22); }
+.brand { gap: 13px; }
+.brand-icon {
+    width: 44px; height: 44px; border-radius: 13px;
+    background: linear-gradient(145deg, #2ea9d7, #6774df 62%, #9e82e8);
+    box-shadow: 0 8px 24px rgba(75, 112, 220, 0.3);
+}
+.brand-icon::after { display: none; }
+.brand-title {
+    font-size: 24px;
+    letter-spacing: -0.8px;
+    background: linear-gradient(110deg, #ffffff 35%, #b9bdff 100%);
+}
+.brand-tag { color: #929bff; letter-spacing: 1.05px; font-size: 10px; }
+
+.nav-bar {
+    background: rgba(13, 16, 29, 0.88);
+    border-color: rgba(184, 193, 224, 0.12);
+    box-shadow: 0 14px 35px -26px #000;
+    margin-bottom: 28px;
+}
+.nav-btn { color: #979bb2; font-weight: 500; }
+.nav-btn:hover { color: #f5f4f8; background: rgba(255,255,255,0.055); }
+.nav-btn.active {
+    color: #f7f6fb;
+    background: linear-gradient(135deg, rgba(94, 108, 220, 0.28), rgba(132, 105, 211, 0.22));
+    border-color: rgba(133, 145, 255, 0.52);
+    box-shadow: 0 5px 18px rgba(77, 83, 181, 0.22);
+}
+
+.btn { border-radius: 11px; font-weight: 600; }
+.btn-primary {
+    background: linear-gradient(135deg, #6674e5, #8b71d6);
+    box-shadow: 0 7px 18px rgba(88, 96, 201, 0.25);
+}
+.btn-primary:hover { box-shadow: 0 10px 24px rgba(88, 96, 201, 0.35); }
+.btn-secondary { background: rgba(255,255,255,0.045); border-color: rgba(184,193,224,0.14); }
+.btn-danger { color: #eca0ac; background: rgba(173, 65, 91, 0.13); border-color: rgba(220, 102, 125, 0.25); }
+
+.glass-panel, .focus-card, .goal-milestone-card, .habit-card, .tasks-checklist-panel,
+.tasks-analytics-card, .coding-card, .task-overview-card {
+    background: rgba(18, 22, 38, 0.86);
+    border-color: rgba(184, 193, 224, 0.12);
+    box-shadow: var(--shadow-card);
+}
+.glass-panel:hover, .goal-milestone-card:hover, .habit-card:hover { border-color: rgba(184,193,224,0.22); }
+
+.dash-hero-banner {
+    background: linear-gradient(118deg, rgba(40, 47, 91, 0.82), rgba(24, 28, 56, 0.9));
+    border-color: rgba(141, 153, 255, 0.28);
+    box-shadow: var(--shadow-card);
+}
+.dash-hero-banner::after { background: radial-gradient(circle, rgba(125, 133, 234, 0.18), transparent 70%); }
+.xp-banner {
+    background: linear-gradient(118deg, rgba(43, 35, 89, 0.74), rgba(24, 28, 56, 0.9));
+    border-color: rgba(178, 156, 255, 0.28);
+}
+.xp-bar-fill { background: linear-gradient(90deg, #8d83e8, #b69fe9); }
+.xp-total-block { background: rgba(155, 132, 226, 0.1); border-color: rgba(178, 156, 255, 0.23); }
+.xp-total-num { color: #d2c4ff; }
+
+.dash-stat-card { background: rgba(17, 22, 38, 0.86); border-color: rgba(184,193,224,0.12); box-shadow: var(--shadow-card); }
+.dash-stat-card:hover { background: rgba(26, 31, 52, 0.95); border-color: rgba(143, 153, 255, 0.32); box-shadow: var(--shadow-glow-cyan); }
+.dash-stat-icon-wrapper { background: rgba(255,255,255,0.045); border-color: rgba(184,193,224,0.12); }
+.dash-stat-val { font-weight: 700; }
+.stat-accent-cyan { border-top-color: #7c8cff !important; }
+.stat-accent-violet { border-top-color: #aa8cf3 !important; }
+.stat-accent-amber { border-top-color: #e7bd72 !important; }
+.stat-accent-emerald { border-top-color: #65c7a0 !important; }
+.stat-accent-rose { border-top-color: #e78f9f !important; }
+.stat-accent-pink { border-top-color: #d99aca !important; }
+
+.progress-bar-bg, .goal-progress-bar-bg, .xp-bar-track { background: rgba(255,255,255,0.075); }
+.progress-bar-fill, .goal-progress-bar-fill { background: linear-gradient(90deg, #7d8cf0, #ae91e8); }
+.form-control, .task-add-input { background: rgba(6, 9, 20, 0.34); border-color: rgba(184,193,224,0.16); }
+.form-control:focus, .task-add-input:focus { border-color: #8792ed; background: rgba(111, 119, 226, 0.07); box-shadow: 0 0 0 3px rgba(111,119,226,0.12); }
+
+.modal-overlay { background: rgba(5, 7, 15, 0.78); }
+.modal-card { background: #15192b; border-color: rgba(184,193,224,0.2); box-shadow: 0 30px 70px -25px #000; }
+.modal-close { background: rgba(255,255,255,0.045); border-color: rgba(184,193,224,0.14); }
+
+.badge-safe { color: #81d7b1; background: rgba(65, 170, 125, 0.12); border-color: rgba(101,199,160,0.24); }
+.badge-warning { color: #edca83; background: rgba(208, 160, 67, 0.12); border-color: rgba(231,189,114,0.24); }
+.badge-critical { color: #efa0ae; background: rgba(192, 78, 103, 0.12); border-color: rgba(231,143,159,0.24); }
+
+.quick-class-item, .habit-item, .focus-item-row, .task-item { background: rgba(255,255,255,0.028); border-color: rgba(184,193,224,0.1); }
+.quick-class-item:hover, .focus-item-row:hover, .task-item:hover { background: rgba(255,255,255,0.055); border-color: rgba(184,193,224,0.2); }
+.quote-panel { background: linear-gradient(135deg, rgba(104, 112, 210, 0.09), rgba(157, 121, 198, 0.08)) !important; border-color: rgba(144, 146, 236, 0.2) !important; }
+
+@media (max-width: 768px) {
+    .app-container { padding-top: 14px !important; }
+    .header, .nav-bar { border-radius: 18px; }
+}
