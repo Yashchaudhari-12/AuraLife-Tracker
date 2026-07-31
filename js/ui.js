@@ -341,6 +341,29 @@ export const UIController = {
         // ══════════════════════════════════════════════════════════════════
         root.innerHTML = `
 
+        <!-- Hero Welcome Banner -->
+        <div class="dash-hero-banner" style="margin-bottom:24px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">
+                <div>
+                    <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.3);padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;color:#38bdf8;margin-bottom:10px;">
+                        <span>⚡ AuraLife Intelligence OS</span>
+                        <span>•</span>
+                        <span>${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
+                    </div>
+                    <h1 style="font-family:var(--font-heading);font-size:28px;font-weight:800;color:white;letter-spacing:-0.5px;">
+                        Welcome back, <span style="background:linear-gradient(135deg, #38bdf8, #c4b5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Engineer</span> 👋
+                    </h1>
+                    <p style="font-size:13.5px;color:var(--text-muted);margin-top:4px;">
+                        ${todaySummary.focusCount > 0 ? `You have <strong style="color:white;">${todaySummary.focusCount} focus tasks</strong> remaining today.` : `Your schedule is clear! Set your focus tasks below.`}
+                    </p>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <button class="btn btn-primary btn-sm" onclick="window.appUI.switchTab('focus')">+ Focus Item</button>
+                    <button class="btn btn-secondary btn-sm" onclick="window.appUI.openModal('modal-add-goal-v2')">+ Create Goal</button>
+                </div>
+            </div>
+        </div>
+
         <!-- XP Banner -->
         <div class="xp-banner" style="margin-bottom:24px;">
             <div class="xp-level-badge" id="dash-level-badge">${lvl.icon}</div>
@@ -359,33 +382,33 @@ export const UIController = {
 
         <!-- 6-stat Row -->
         <div class="dash-stats-row" style="margin-bottom:24px;">
-            <div class="dash-stat-card">
-                <div class="dash-stat-icon">📚</div>
+            <div class="dash-stat-card stat-accent-cyan">
+                <div class="dash-stat-icon-wrapper">📚</div>
                 <div class="dash-stat-val">${overallPercentage}%</div>
                 <div class="dash-stat-lbl">Attendance</div>
             </div>
-            <div class="dash-stat-card">
-                <div class="dash-stat-icon">⚡</div>
+            <div class="dash-stat-card stat-accent-violet">
+                <div class="dash-stat-icon-wrapper">⚡</div>
                 <div class="dash-stat-val">${focusStats.completed}/${focusStats.total}</div>
                 <div class="dash-stat-lbl">Today's Focus</div>
             </div>
-            <div class="dash-stat-card">
-                <div class="dash-stat-icon">🔥</div>
+            <div class="dash-stat-card stat-accent-amber">
+                <div class="dash-stat-icon-wrapper">🔥</div>
                 <div class="dash-stat-val">${habitStats.done}/${habitStats.total}</div>
                 <div class="dash-stat-lbl">Habits Done</div>
             </div>
-            <div class="dash-stat-card">
-                <div class="dash-stat-icon">🎯</div>
+            <div class="dash-stat-card stat-accent-emerald">
+                <div class="dash-stat-icon-wrapper">🎯</div>
                 <div class="dash-stat-val">${weeklyStats.completed}/${weeklyStats.total}</div>
                 <div class="dash-stat-lbl">Weekly Goals</div>
             </div>
-            <div class="dash-stat-card">
-                <div class="dash-stat-icon">🏆</div>
+            <div class="dash-stat-card stat-accent-rose">
+                <div class="dash-stat-icon-wrapper">🏆</div>
                 <div class="dash-stat-val">${yearlyStats.completed}/${yearlyStats.total}</div>
                 <div class="dash-stat-lbl">Yearly Goals</div>
             </div>
-            <div class="dash-stat-card">
-                <div class="dash-stat-icon">⚡</div>
+            <div class="dash-stat-card stat-accent-pink">
+                <div class="dash-stat-icon-wrapper">⭐</div>
                 <div class="dash-stat-val">+${todaySummary.xpEarned}</div>
                 <div class="dash-stat-lbl">XP Today</div>
             </div>
