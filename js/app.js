@@ -11,11 +11,11 @@ DataMigration.runIfNeeded();
 window.appUI = UIController;
 window.appStorage = Storage;
 
-function loadMobileStyles() {
-    if (document.querySelector('link[href="css/mobile.css"]')) return;
+function loadStylesheet(href) {
+    if (document.querySelector(`link[href="${href}"]`)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'css/mobile.css';
+    link.href = href;
     document.head.appendChild(link);
 }
 
@@ -28,7 +28,8 @@ function enhanceAccessibility() {
     });
 }
 
-loadMobileStyles();
+loadStylesheet('css/mobile.css');
+loadStylesheet('css/classy.css');
 try {
     UIController.init();
     enhanceAccessibility();
