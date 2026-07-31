@@ -24,6 +24,18 @@ const DEFAULT_TIMETABLE = {
 };
 
 export const Storage = {
+    _syncTimer: null,
+
+    // Debounced sync — waits 3s after last change before writing to Firestore
+    // Prevents quota exhaustion from rapid consecutive changes
+    _scheduleSync() {
+        if (!window.appCloud) return;
+        clearTimeout(this._syncTimer);
+        this._syncTimer = setTimeout(() => {
+            window.appCloud.syncAllDataToCloud();
+        }, 3000);
+    },
+
     getSubjects() {
         const data = localStorage.getItem(STORAGE_KEYS.SUBJECTS);
         if (!data) {
@@ -39,7 +51,11 @@ export const Storage = {
 
     saveSubjects(subjects) {
         localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(subjects));
-        if (window.appCloud) window.appCloud.syncAllDataToCloud();
+        this._scheduleSync();
+    },
+
+    _saveSubjectsLocal(subjects) {
+        localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(subjects));
     },
 
     getGoals() {
@@ -57,7 +73,11 @@ export const Storage = {
 
     saveGoals(goals) {
         localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(goals));
-        if (window.appCloud) window.appCloud.syncAllDataToCloud();
+        this._scheduleSync();
+    },
+
+    _saveGoalsLocal(goals) {
+        localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(goals));
     },
 
     getTimetable() {
@@ -75,14 +95,18 @@ export const Storage = {
 
     saveTimetable(timetable) {
         localStorage.setItem(STORAGE_KEYS.TIMETABLE, JSON.stringify(timetable));
-        if (window.appCloud) window.appCloud.syncAllDataToCloud();
+        this._scheduleSync();
+    },
+
+    _saveTimetableLocal(timetable) {
+        localStorage.setItem(STORAGE_KEYS.TIMETABLE, JSON.stringify(timetable));
     },
 
     clearAll() {
         localStorage.removeItem(STORAGE_KEYS.SUBJECTS);
         localStorage.removeItem(STORAGE_KEYS.GOALS);
         localStorage.removeItem(STORAGE_KEYS.TIMETABLE);
-        if (window.appCloud) window.appCloud.syncAllDataToCloud();
+        this._scheduleSync();
     },
 
     exportData() {

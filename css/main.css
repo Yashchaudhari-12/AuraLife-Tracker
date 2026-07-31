@@ -420,3 +420,8 @@ body {
     .header { flex-direction: column; gap: 16px; align-items: flex-start; }
     .header-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
 }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.8); }
+}

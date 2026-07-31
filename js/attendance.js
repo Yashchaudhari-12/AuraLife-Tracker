@@ -66,11 +66,11 @@ export const AttendanceCalc = {
 
     calculateOverallAttendance(subjects) {
         if (!subjects || subjects.length === 0) {
-            return { totalAttended: 0, totalClasses: 0, overallPercentage: 100 };
+            return { totalAttended: 0, totalClasses: 0, overallPercentage: 0 };
         }
         const totalAttended = subjects.reduce((acc, s) => acc + (s.attended || 0), 0);
         const totalClasses = subjects.reduce((acc, s) => acc + (s.total || 0), 0);
-        const overallPercentage = totalClasses > 0 ? Number(((totalAttended / totalClasses) * 100).toFixed(1)) : 100;
+        const overallPercentage = totalClasses > 0 ? Number(((totalAttended / totalClasses) * 100).toFixed(1)) : 0;
 
         return { totalAttended, totalClasses, overallPercentage };
     }

@@ -1,24 +1,36 @@
 /**
  * Firebase Initialization & Configuration Module
- * Safe dynamic initialization for Firebase v10+ App, Auth, and Firestore
+ * Uses a live-reference object to avoid stale import bindings
  */
 
-let app = null;
-let auth = null;
-let db = null;
-let isFirebaseInitialized = false;
+// All Firebase refs live in one object — imported modules get live access
+export const Firebase = {
+    app: null,
+    auth: null,
+    db: null,
+    initialized: false,
 
-let signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged;
-let doc, setDoc, getDoc, onSnapshot;
+    // Auth functions
+    signInWithEmailAndPassword: null,
+    createUserWithEmailAndPassword: null,
+    signOut: null,
+    onAuthStateChanged: null,
+
+    // Firestore functions
+    doc: null,
+    setDoc: null,
+    getDoc: null,
+    onSnapshot: null,
+};
 
 // Firebase Configuration Object
 const defaultFirebaseConfig = {
-    apiKey: "AIzaSyDemoAuraLifeTrackerKey2026",
+    apiKey: "AIzaSyB66g2qrkGzFMTA1S_4VnY-Pha690EePOc",
     authDomain: "auralife-tracker.firebaseapp.com",
     projectId: "auralife-tracker"
 };
 
-function getActiveFirebaseConfig() {
+export function getActiveFirebaseConfig() {
     const custom = localStorage.getItem('auralife_firebase_config');
     if (custom) {
         try { return JSON.parse(custom); } catch(e) {}
@@ -27,47 +39,43 @@ function getActiveFirebaseConfig() {
 }
 
 export async function initFirebaseSDK() {
+    if (Firebase.initialized) return; // Don't re-init
     try {
-        const firebaseApp = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js");
-        const firebaseAuth = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js");
-        const firebaseFirestore = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+        const [firebaseApp, firebaseAuth, firebaseFirestore] = await Promise.all([
+            import("https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"),
+            import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"),
+            import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"),
+        ]);
 
-        signInWithEmailAndPassword = firebaseAuth.signInWithEmailAndPassword;
-        createUserWithEmailAndPassword = firebaseAuth.createUserWithEmailAndPassword;
-        signOut = firebaseAuth.signOut;
-        onAuthStateChanged = firebaseAuth.onAuthStateChanged;
+        // Assign auth functions to live reference object
+        Firebase.signInWithEmailAndPassword = firebaseAuth.signInWithEmailAndPassword;
+        Firebase.createUserWithEmailAndPassword = firebaseAuth.createUserWithEmailAndPassword;
+        Firebase.signOut = firebaseAuth.signOut;
+        Firebase.onAuthStateChanged = firebaseAuth.onAuthStateChanged;
 
-        doc = firebaseFirestore.doc;
-        setDoc = firebaseFirestore.setDoc;
-        getDoc = firebaseFirestore.getDoc;
-        onSnapshot = firebaseFirestore.onSnapshot;
+        // Assign firestore functions to live reference object
+        Firebase.doc = firebaseFirestore.doc;
+        Firebase.setDoc = firebaseFirestore.setDoc;
+        Firebase.getDoc = firebaseFirestore.getDoc;
+        Firebase.onSnapshot = firebaseFirestore.onSnapshot;
 
         const config = getActiveFirebaseConfig();
-        if (config && config.apiKey && !config.apiKey.includes("DemoAuraLifeTrackerKey")) {
-            app = firebaseApp.initializeApp(config);
-            auth = firebaseAuth.getAuth(app);
-            db = firebaseFirestore.getFirestore(app);
-            isFirebaseInitialized = true;
-            console.log("🔥 Firebase App Connected.");
+        const isDemoKey = !config.apiKey || config.apiKey.includes("DemoAuraLifeTrackerKey");
+
+        if (!isDemoKey) {
+            try {
+                Firebase.app = firebaseApp.initializeApp(config);
+                Firebase.auth = firebaseAuth.getAuth(Firebase.app);
+                Firebase.db = firebaseFirestore.getFirestore(Firebase.app);
+                Firebase.initialized = true;
+                console.log("🔥 Firebase App Connected with project:", config.projectId);
+            } catch (initErr) {
+                console.warn("Firebase initialization error:", initErr.message);
+            }
         } else {
-            console.log("ℹ️ Firebase configured in Local Mode (waiting for user custom credentials).");
+            console.log("ℹ️ No custom Firebase config — running in Local Mode.");
         }
     } catch (err) {
-        console.warn("Firebase SDK initialization deferred or offline:", err);
+        console.warn("Firebase SDK failed to load (offline?):", err);
     }
 }
-
-export { 
-    app, 
-    auth, 
-    db, 
-    isFirebaseInitialized,
-    signInWithEmailAndPassword, 
-    createUserWithEmailAndPassword, 
-    signOut, 
-    onAuthStateChanged,
-    doc, 
-    setDoc, 
-    getDoc, 
-    onSnapshot 
-};

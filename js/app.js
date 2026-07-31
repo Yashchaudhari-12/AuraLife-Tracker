@@ -5,6 +5,10 @@
 
 import { UIController } from './ui.js';
 import { Storage } from './storage.js';
+import { DataMigration } from './migration.js';
+
+// Run Data Migration if needed
+DataMigration.runIfNeeded();
 
 // 1. Instantly attach UIController to window so all button clicks work immediately
 window.appUI = UIController;
@@ -23,9 +27,13 @@ async function loadCloudServices() {
     try {
         const { CloudStorage } = await import('./cloud-storage.js');
         const { AuthUI } = await import('./auth-ui.js');
-        
+
         window.appCloud = CloudStorage;
-        
+
+        // Global helpers for debugging
+        window.syncNow = () => CloudStorage.syncAllDataToCloud();
+        window.diagnoseFirebase = () => CloudStorage._diagnose();
+
         AuthUI.init(() => {
             UIController.renderAll();
         });

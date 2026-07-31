@@ -17,6 +17,10 @@
     <link rel="stylesheet" href="css/attendance.css">
     <link rel="stylesheet" href="css/goals.css">
     <link rel="stylesheet" href="css/timetable.css">
+    <link rel="stylesheet" href="css/tasks.css">
+    <link rel="stylesheet" href="css/habits.css">
+    <link rel="stylesheet" href="css/calendar.css">
+    <link rel="stylesheet" href="css/redesign.css">
 </head>
 <body>
     <div class="app-container">
@@ -27,7 +31,7 @@
                 <div class="brand-icon">⚡</div>
                 <div>
                     <div class="brand-title">AuraLife</div>
-                    <div class="brand-tag">Attendance & Goal Tracker</div>
+                    <div class="brand-tag">Attendance &amp; Productivity OS</div>
                 </div>
             </div>
 
@@ -50,6 +54,7 @@
             <!-- Action Buttons & Auth Pill -->
             <div class="header-actions">
                 <div id="header-auth-pill"></div>
+                <div id="sync-status-indicator" style="display:none; align-items:center; gap:6px; font-size:11px; padding:5px 11px; border-radius:999px; transition: all 0.3s ease;"></div>
 
                 <button class="btn btn-secondary btn-sm" id="btn-export-backup" title="Export Backup JSON">
                     📥 Export
@@ -64,8 +69,8 @@
                 <button class="btn btn-primary btn-sm" id="btn-add-subject">
                     + Add Subject
                 </button>
-                <button class="btn btn-primary btn-sm" id="btn-add-goal">
-                    + Add Goal
+                <button class="btn btn-primary btn-sm" onclick="window.appUI.openModal('modal-add-goal-v2')">
+                    + Create Goal
                 </button>
             </div>
         </header>
@@ -75,17 +80,26 @@
             <button class="nav-btn active" data-tab="dashboard">
                 📊 Dashboard
             </button>
+            <button class="nav-btn" data-tab="focus">
+                ⚡ Today's Focus
+            </button>
+            <button class="nav-btn" data-tab="habits">
+                🔥 Habits
+            </button>
+            <button class="nav-btn" data-tab="goals-v2">
+                🎯 Milestone Goals
+            </button>
             <button class="nav-btn" data-tab="attendance">
                 🎓 College Attendance
             </button>
-            <button class="nav-btn" data-tab="goals">
-                🎯 Life & Skill Goals
-            </button>
             <button class="nav-btn" data-tab="timetable">
-                📅 Weekly Schedule
+                📅 Schedule
+            </button>
+            <button class="nav-btn" data-tab="calendar">
+                📅 Calendar
             </button>
             <button class="nav-btn" data-tab="analytics">
-                📈 Analytics & Insights
+                📈 Analytics
             </button>
         </nav>
 
@@ -93,65 +107,25 @@
 
         <!-- TAB 1: DASHBOARD -->
         <main id="tab-dashboard" class="tab-content">
-            <!-- Welcome Banner -->
-            <div class="welcome-banner">
-                <div>
-                    <h1 class="welcome-title">Welcome Back, Scholar! 🚀</h1>
-                    <div class="welcome-quote">
-                        "Consistency is not about perfection, it's about showing up every single day."
-                    </div>
-                </div>
-                <div class="life-score-ring">
-                    <div id="dash-life-score-ring-container"></div>
-                    <div style="position: absolute; text-align: center;">
-                        <div class="life-score-val" id="dash-life-score-val">0</div>
-                        <div class="life-score-label">Life Score</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid-2">
-                <!-- Left Column: Today's Classes & Subject Health -->
-                <div>
-                    <div class="glass-panel" style="margin-bottom: 20px;">
-                        <div class="dashboard-widget-title">
-                            <span>📚 Today's Scheduled Classes</span>
-                            <span style="font-size: 12px; color: var(--text-muted);">Quick Attendance Logger</span>
-                        </div>
-                        <div id="dash-today-classes-list"></div>
-                    </div>
-
-                    <div class="glass-panel">
-                        <div class="dashboard-widget-title">
-                            <span>🎓 Attendance Health Summary</span>
-                        </div>
-                        <div id="dash-subject-overview-list"></div>
-                    </div>
-                </div>
-
-                <!-- Right Column: Habits & Life Goals -->
-                <div>
-                    <div class="glass-panel" style="margin-bottom: 20px;">
-                        <div class="dashboard-widget-title">
-                            <span>🔥 Today's Habit Streaks</span>
-                            <span style="font-size: 12px; color: var(--primary-amber);">Daily Check-in</span>
-                        </div>
-                        <div id="dash-habits-list"></div>
-                    </div>
-
-                    <div class="glass-panel">
-                        <div class="dashboard-widget-title">
-                            <span>💡 Productivity Tip</span>
-                        </div>
-                        <p style="font-size: 14px; color: var(--text-muted); line-height: 1.6;">
-                            Maintain at least <strong>75% attendance</strong> across all core college subjects to keep safe bunk allowances ready before semester exam periods!
-                        </p>
-                    </div>
-                </div>
-            </div>
+            <div id="dashboard-root"></div>
         </main>
 
-        <!-- TAB 2: COLLEGE ATTENDANCE -->
+        <!-- TAB 2: TODAY'S FOCUS -->
+        <main id="tab-focus" class="tab-content" style="display: none;">
+            <div id="focus-root"></div>
+        </main>
+
+        <!-- TAB 3: HABITS -->
+        <main id="tab-habits" class="tab-content" style="display: none;">
+            <div id="habits-tab-root"></div>
+        </main>
+
+        <!-- TAB 4: MILESTONE GOALS -->
+        <main id="tab-goals-v2" class="tab-content" style="display: none;">
+            <div id="goals-v2-root"></div>
+        </main>
+
+        <!-- TAB 5: COLLEGE ATTENDANCE -->
         <main id="tab-attendance" class="tab-content" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <div>
@@ -165,53 +139,67 @@
             <div id="attendance-subjects-grid" class="grid-2"></div>
         </main>
 
-        <!-- TAB 3: LIFE & SKILL GOALS -->
-        <main id="tab-goals" class="tab-content" style="display: none;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <div>
-                    <h2 style="font-family: var(--font-heading); font-size: 24px; font-weight: 800;">Life & Skill Goals</h2>
-                    <p style="font-size: 13px; color: var(--text-muted);">Track coding challenges, daily habits, fitness targets, and personal milestones.</p>
-                </div>
-                <button class="btn btn-primary" onclick="window.appUI.openModal('modal-add-goal')">+ Create Life Goal</button>
-            </div>
-
-            <!-- Goal Filters -->
-            <div class="goals-filter-bar">
-                <button class="filter-btn active" data-filter="all">All Goals</button>
-                <button class="filter-btn" data-filter="coding">💻 Coding & Tech</button>
-                <button class="filter-btn" data-filter="fitness">🏋️ Health & Fitness</button>
-                <button class="filter-btn" data-filter="growth">🧠 Personal Growth</button>
-            </div>
-
-            <!-- Goals Grid -->
-            <div id="goals-grid" class="grid-3"></div>
-        </main>
-
-        <!-- TAB 4: WEEKLY TIMETABLE -->
+        <!-- TAB 6: WEEKLY SCHEDULE -->
         <main id="tab-timetable" class="tab-content" style="display: none;">
-            <div style="margin-bottom: 20px;">
-                <h2 style="font-family: var(--font-heading); font-size: 24px; font-weight: 800;">Weekly Class Timetable</h2>
-                <p style="font-size: 13px; color: var(--text-muted);">Your regular weekly schedule for quick daily attendance logging.</p>
+            <div class="timetable-header-row">
+                <div>
+                    <h2 style="font-family: var(--font-heading); font-size: 24px; font-weight: 800;">📅 Weekly Class Schedule</h2>
+                    <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Build your weekly timetable — classes auto-appear on today's dashboard.</p>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div class="timetable-day-switcher" id="timetable-day-switcher"></div>
+                    <button class="btn btn-primary" id="btn-add-slot">
+                        <span style="font-size: 16px; margin-right: 4px;">+</span> Add Class
+                    </button>
+                </div>
             </div>
 
             <div id="timetable-grid-container" class="timetable-grid"></div>
         </main>
 
-        <!-- TAB 5: ANALYTICS & INSIGHTS -->
-        <main id="tab-analytics" class="tab-content" style="display: none;">
-            <div style="margin-bottom: 20px;">
-                <h2 style="font-family: var(--font-heading); font-size: 24px; font-weight: 800;">Analytics & Performance Insights</h2>
-                <p style="font-size: 13px; color: var(--text-muted);">Visual statistics for subject attendance performance vs minimum target thresholds.</p>
-            </div>
-
-            <div class="glass-panel" style="margin-bottom: 24px;">
-                <div class="dashboard-widget-title">
-                    <span>📊 Subject Attendance vs Target (%)</span>
-                </div>
-                <div id="analytics-bar-chart" style="padding: 20px 0;"></div>
-            </div>
+        <!-- TAB 7: CALENDAR -->
+        <main id="tab-calendar" class="tab-content" style="display: none;">
+            <div id="calendar-root"></div>
         </main>
 
+        <!-- TAB 8: ANALYTICS & INSIGHTS -->
+        <main id="tab-analytics" class="tab-content" style="display: none;">
+            <div id="analytics-root"></div>
+        </main>
+
+    </div>
+
+    <!-- MODALS -->
+
+    <!-- Modal: Add Habit -->
+    <div id="modal-add-habit" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">Add Daily Habit</div>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="form-add-habit">
+                <div class="form-group">
+                    <label class="form-label">Habit Name *</label>
+                    <input type="text" id="field-habit-name" class="form-control"
+                           placeholder="e.g. Sleep 7 hours, Drink 2L water..." required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Choose Icon</label>
+                    <div class="emoji-picker-grid" id="emoji-picker-grid"></div>
+                    <input type="hidden" id="field-habit-icon" value="⭐">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Choose Color</label>
+                    <div class="color-picker-row" id="color-picker-row"></div>
+                    <input type="hidden" id="field-habit-color" value="#06b6d4">
+                </div>
+                <div style="display:flex; gap:10px; margin-top:8px;">
+                    <button type="button" class="btn btn-secondary modal-cancel" style="flex:1;">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="flex:1;">Add Habit</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- MODALS -->
@@ -384,7 +372,141 @@
         </div>
     </div>
 
+    <!-- Modal: Add Class Slot -->
+    <div id="modal-add-slot" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">📅 Add Class to Schedule</div>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="form-add-slot">
+                <div class="form-group">
+                    <label class="form-label">Day of the Week</label>
+                    <select id="slot-day" class="form-control" required>
+                        <option value="">Select a day...</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Subject</label>
+                    <select id="slot-subject" class="form-control" required>
+                        <option value="">Select subject...</option>
+                    </select>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="form-group">
+                        <label class="form-label">Start Time</label>
+                        <input type="time" id="slot-time-start" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">End Time</label>
+                        <input type="time" id="slot-time-end" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Room / Location <span style="color: var(--text-dim); font-size: 11px;">(optional)</span></label>
+                    <input type="text" id="slot-room" class="form-control" placeholder="e.g. Room 301, Lab B, Online...">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add to Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add Milestone Goal V2 -->
+    <div id="modal-add-goal-v2" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">🎯 Create Milestone Goal</div>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="form-add-goal-v2">
+                <div class="form-group">
+                    <label class="form-label">Goal Title *</label>
+                    <input type="text" id="field-goalv2-title" class="form-control"
+                           placeholder="e.g. Solve 150 LeetCode Problems, Build Portfolio..." required>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Time Period</label>
+                        <select id="field-goalv2-period" class="form-control">
+                            <option value="weekly">📅 Weekly Goal</option>
+                            <option value="monthly">🗓️ Monthly Goal</option>
+                            <option value="yearly" selected>🏆 Yearly Goal</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Target Count <span style="font-size:11px;color:var(--text-muted);">(optional)</span></label>
+                        <input type="number" id="field-goalv2-target" class="form-control" placeholder="e.g. 150, 250 (leave empty if single task)">
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select id="field-goalv2-category" class="form-control">
+                            <option value="coding" selected>💻 Coding &amp; Tech</option>
+                            <option value="college">📚 College</option>
+                            <option value="fitness">🏋️ Fitness</option>
+                            <option value="finance">💰 Finance</option>
+                            <option value="personal">🎨 Personal</option>
+                            <option value="family">🏠 Family</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Deadline <span style="font-size:11px;color:var(--text-muted);">(optional)</span></label>
+                        <input type="date" id="field-goalv2-deadline" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes / Action Plan <span style="font-size:11px;color:var(--text-muted);">(optional)</span></label>
+                    <textarea id="field-goalv2-notes" class="form-control" rows="2" placeholder="e.g. Focus on Sliding Window and DP questions..."></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Milestone Goal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Coding Targets -->
+    <div id="modal-edit-coding-targets" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">💻 Customize Coding &amp; DSA Targets</div>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="form-edit-coding-targets">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">LeetCode Target (problems)</label>
+                        <input type="number" id="field-coding-lc-target" class="form-control" placeholder="e.g. 150">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Striver A2Z Target (problems)</label>
+                        <input type="number" id="field-coding-a2z-target" class="form-control" placeholder="e.g. 250">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Today's DSA Goal</label>
+                    <input type="text" id="field-coding-daily-goal" class="form-control" placeholder="e.g. Solve 1 LeetCode &amp; 1 A2Z topic">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Targets</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Application Script -->
-    <script type="module" src="js/app.js"></script>
+    <script type="module" src="js/app.js?v=202607311915"></script>
 </body>
 </html>
