@@ -1,0 +1,66 @@
+/* Weekly habit planner */
+.week-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 24px 28px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(6, 182, 212, 0.25);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(120deg, rgba(6, 182, 212, 0.13), rgba(16, 185, 129, 0.08));
+}
+.week-title { font-family: var(--font-heading); font-size: 28px; font-weight: 800; }
+.week-subtitle { color: var(--text-muted); font-size: 13px; margin-top: 5px; }
+.week-board {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(130px, 1fr));
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+}
+.week-day-column {
+    min-height: 260px;
+    padding: 14px;
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.035);
+}
+.week-day-column.is-today { border-color: rgba(6, 182, 212, 0.7); box-shadow: 0 0 22px rgba(6, 182, 212, 0.1); }
+.week-day-heading { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-heading); font-size: 16px; font-weight: 800; }
+.week-day-heading em { color: var(--primary-cyan); font-size: 9px; font-style: normal; text-transform: uppercase; letter-spacing: .4px; }
+.week-day-date { color: var(--text-dim); font-size: 10px; margin-top: 3px; }
+.week-day-list { display: grid; gap: 8px; margin-top: 18px; }
+.week-habit-item { display: flex; align-items: center; gap: 7px; padding: 9px 7px; border-left: 3px solid var(--habit-color); border-radius: 6px; background: rgba(255, 255, 255, 0.05); }
+.week-habit-item.is-done { opacity: .62; }
+.week-habit-icon { font-size: 16px; flex: 0 0 auto; }
+.week-habit-name { min-width: 0; color: var(--text-main); font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; }
+.week-check-btn { margin-left: auto; flex: 0 0 auto; width: 24px; height: 24px; border: 1px solid var(--habit-color); border-radius: 50%; background: transparent; color: var(--habit-color); cursor: pointer; font-weight: 800; }
+.week-habit-item.is-done .week-check-btn { background: var(--habit-color); color: white; }
+.week-empty-day { padding-top: 12px; color: var(--text-dim); font-size: 11px; }
+.week-settings { margin-top: 24px; padding: 22px; border: 1px solid var(--border-glass); border-radius: var(--radius-xl); background: rgba(15, 23, 42, .48); }
+.week-settings-heading h3 { font-family: var(--font-heading); font-size: 18px; }
+.week-settings-heading p { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+.week-schedule-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px 0; border-top: 1px solid var(--border-glass); }
+.week-schedule-row:first-of-type { margin-top: 18px; }
+.week-schedule-name { display: flex; align-items: center; gap: 9px; min-width: 180px; font-size: 13px; }
+.week-schedule-name span { font-size: 19px; }
+.week-schedule-name strong { overflow-wrap: anywhere; }
+.week-day-toggles { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.week-day-toggle { min-width: 40px; padding: 7px 6px; border: 1px solid var(--border-glass); border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: 700; }
+.week-day-toggle.selected { border-color: var(--habit-color); background: color-mix(in srgb, var(--habit-color) 18%, transparent); color: white; }
+.week-empty-state { color: var(--text-muted); font-size: 13px; padding: 22px 0 4px; }
+.weekday-picker { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+.weekday-option input { position: absolute; opacity: 0; pointer-events: none; }
+.weekday-option span { display: inline-flex; min-width: 43px; justify-content: center; padding: 8px 7px; border: 1px solid var(--border-glass); border-radius: var(--radius-sm); color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: 700; }
+.weekday-option input:checked + span { border-color: var(--primary-cyan); background: rgba(6, 182, 212, .16); color: white; }
+.form-hint { color: var(--text-dim); font-size: 11px; margin-top: 7px; }
+@media (max-width: 900px) {
+    .week-board { grid-template-columns: repeat(7, minmax(150px, 1fr)); }
+}
+@media (max-width: 600px) {
+    .week-header { align-items: flex-start; flex-direction: column; padding: 18px; }
+    .week-title { font-size: 24px; }
+    .week-schedule-row { align-items: flex-start; flex-direction: column; gap: 12px; }
+    .week-day-toggles { justify-content: flex-start; }
+}

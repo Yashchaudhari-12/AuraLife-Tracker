@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="css/timetable.css">
     <link rel="stylesheet" href="css/tasks.css">
     <link rel="stylesheet" href="css/habits.css">
+    <link rel="stylesheet" href="css/week.css">
     <link rel="stylesheet" href="css/calendar.css">
     <link rel="stylesheet" href="css/redesign.css">
 </head>
@@ -28,7 +29,7 @@
         <!-- Header Top Bar -->
         <header class="header">
             <div class="brand">
-                <div class="brand-icon">⚡</div>
+                <div class="brand-icon" role="img" aria-label="AuraLife logo"><span class="brand-mark">A</span></div>
                 <div>
                     <div class="brand-title">AuraLife</div>
                     <div class="brand-tag">Attendance &amp; Productivity OS</div>
@@ -46,7 +47,7 @@
                     <div id="stat-header-goals" style="font-family: var(--font-heading); font-size: 16px; font-weight: 800; color: var(--primary-violet);">--</div>
                 </div>
                 <div style="text-align: center; padding: 6px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: var(--radius-md);">
-                    <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Habit Streak</div>
+                    <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Overall Streak</div>
                     <div id="stat-header-streak" style="font-family: var(--font-heading); font-size: 16px; font-weight: 800; color: var(--primary-amber);">--</div>
                 </div>
             </div>
@@ -86,6 +87,9 @@
             <button class="nav-btn" data-tab="habits">
                 🔥 Habits
             </button>
+            <button class="nav-btn" data-tab="week">
+                🗓️ Weekly Rituals
+            </button>
             <button class="nav-btn" data-tab="goals-v2">
                 🎯 Milestone Goals
             </button>
@@ -120,7 +124,12 @@
             <div id="habits-tab-root"></div>
         </main>
 
-        <!-- TAB 4: MILESTONE GOALS -->
+        <!-- TAB 4: WEEKLY HABIT PLAN -->
+        <main id="tab-week" class="tab-content" style="display: none;">
+            <div id="week-tab-root"></div>
+        </main>
+
+        <!-- TAB 5: MILESTONE GOALS -->
         <main id="tab-goals-v2" class="tab-content" style="display: none;">
             <div id="goals-v2-root"></div>
         </main>
@@ -135,6 +144,8 @@
                 <button class="btn btn-primary" onclick="window.appUI.openModal('modal-add-subject')">+ Add New Subject</button>
             </div>
 
+            <div id="attendance-overall" class="attendance-overall" aria-live="polite"></div>
+
             <!-- Subject Cards Grid -->
             <div id="attendance-subjects-grid" class="grid-2"></div>
         </main>
@@ -148,6 +159,9 @@
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <div class="timetable-day-switcher" id="timetable-day-switcher"></div>
+                    <button class="btn btn-secondary" id="btn-attend-today" title="Mark every lecture scheduled for today as attended">
+                        ✓ Attend Today
+                    </button>
                     <button class="btn btn-primary" id="btn-add-slot">
                         <span style="font-size: 16px; margin-right: 4px;">+</span> Add Class
                     </button>
@@ -193,6 +207,11 @@
                     <label class="form-label">Choose Color</label>
                     <div class="color-picker-row" id="color-picker-row"></div>
                     <input type="hidden" id="field-habit-color" value="#06b6d4">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Schedule this habit</label>
+                    <div class="weekday-picker" id="habit-weekday-picker"></div>
+                    <div class="form-hint">Leave every day selected for a daily habit.</div>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:8px;">
                     <button type="button" class="btn btn-secondary modal-cancel" style="flex:1;">Cancel</button>
@@ -507,6 +526,6 @@
     </div>
 
     <!-- Application Script -->
-    <script type="module" src="js/app.js?v=202607311915"></script>
+    <script type="module" src="js/app.js?v=2026080101"></script>
 </body>
 </html>

@@ -82,28 +82,77 @@ export const HabitManager = {
         return (habit.history || []).includes(this.todayKey());
     },
 
+    isScheduledOnDate(habit, date = new Date()) {
+        const weekdays = habit.weekdays;
+        if (!Array.isArray(weekdays) || weekdays.length === 0) return true;
+        return weekdays.includes(date.getDay());
+    },
+
+    getScheduledForToday(habits) {
+        return (habits || []).filter(habit => this.isScheduledOnDate(habit));
+    },
+
     getTodayStats(habits) {
-        const done  = habits.filter(h => this.isCheckedToday(h)).length;
-        const total = habits.length;
+        const scheduled = this.getScheduledForToday(habits);
+        const done  = scheduled.filter(h => this.isCheckedToday(h)).length;
+        const total = scheduled.length;
         const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
         return { done, total, pct };
     },
 
+    getOverallStreak(habits) {
+        if (!habits || habits.length === 0) return 0;
+
+        const historySets = habits.map(habit => new Set(habit.history || []));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        let streak = 0;
+
+        for (let daysAgo = 0; daysAgo < 366; daysAgo++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() - daysAgo);
+            const scheduledIndexes = habits.reduce((indexes, habit, index) => {
+                if (this.isScheduledOnDate(habit, date)) indexes.push(index);
+                return indexes;
+            }, []);
+
+            // Days without scheduled habits do not affect the overall streak.
+            if (scheduledIndexes.length === 0) continue;
+
+            const dateKey = date.toISOString().split('T')[0];
+            const completed = scheduledIndexes.every(index => historySets[index].has(dateKey));
+            if (!completed) break;
+            streak++;
+        }
+
+        return streak;
+    },
+
     // ─── CRUD ─────────────────────────────────────────────────────────────────
 
-    addHabit(name, icon, color) {
+    addHabit(name, icon, color, weekdays = []) {
         const habits = this.getData();
         habits.push({
             id: 'habit-' + Date.now(),
             name: name.trim(),
             icon: icon || '⭐',
             color: color || '#06b6d4',
+            weekdays: Array.isArray(weekdays) ? weekdays : [],
             history: [],
             streak: 0,
             bestStreak: 0,
             createdAt: this.todayKey(),
         });
         this.saveData(habits);
+    },
+
+    updateWeekdays(habitId, weekdays) {
+        const habits = this.getData();
+        const habit = habits.find(h => h.id === habitId);
+        if (!habit) return null;
+        habit.weekdays = Array.isArray(weekdays) ? weekdays.sort((a, b) => a - b) : [];
+        this.saveData(habits);
+        return habit;
     },
 
     toggleToday(habitId) {

@@ -17,7 +17,12 @@ export const MilestoneGoalsV2 = {
 
     getData() {
         try {
-            return JSON.parse(localStorage.getItem(this.STORAGE_KEY) || 'null') || this._defaultData();
+            const data = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || 'null') || this._defaultData();
+            if (this._applyPeriodResets(data)) {
+                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+                if (window.appStorage) window.appStorage._scheduleSync();
+            }
+            return data;
         } catch (e) {
             return this._defaultData();
         }
@@ -34,6 +39,83 @@ export const MilestoneGoalsV2 = {
             monthly: [],
             yearly: [],
         };
+    },
+
+    _periodKey(period, date = new Date()) {
+        const localDate = new Date(date);
+        if (period === 'yearly') return String(localDate.getFullYear());
+        if (period === 'monthly') {
+            return `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}`;
+        }
+        const monday = new Date(localDate);
+        const daysSinceMonday = (monday.getDay() + 6) % 7;
+        monday.setDate(monday.getDate() - daysSinceMonday);
+        return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+    },
+
+    _formatDate(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    },
+
+    _periodEndDate(period, periodKey = this._periodKey(period)) {
+        if (period === 'weekly') {
+            const start = new Date(`${periodKey}T00:00:00`);
+            start.setDate(start.getDate() + 6);
+            return this._formatDate(start);
+        }
+        if (period === 'monthly') {
+            const [year, month] = periodKey.split('-').map(Number);
+            return this._formatDate(new Date(year, month, 0));
+        }
+        return `${periodKey}-12-31`;
+    },
+
+    _periodResetDate(period, periodKey) {
+        if (period === 'weekly') {
+            const nextMonday = new Date(`${periodKey}T00:00:00`);
+            nextMonday.setDate(nextMonday.getDate() + 7);
+            return this._formatDate(nextMonday);
+        }
+        if (period === 'monthly') {
+            const [year, month] = periodKey.split('-').map(Number);
+            return this._formatDate(new Date(year, month, 1));
+        }
+        return `${Number(periodKey) + 1}-01-01`;
+    },
+
+    _applyPeriodResets(data) {
+        let changed = false;
+        ['weekly', 'monthly', 'yearly'].forEach(period => {
+            const currentPeriodKey = this._periodKey(period);
+            (data[period] || []).forEach(goal => {
+                if (!goal.periodKey) {
+                    goal.periodKey = currentPeriodKey;
+                    changed = true;
+                    return;
+                }
+                if (goal.periodKey === currentPeriodKey) return;
+                if (!Array.isArray(goal.history)) goal.history = [];
+                goal.history.push({
+                    periodKey: goal.periodKey,
+                    currentCount: goal.currentCount || 0,
+                    targetCount: goal.targetCount || null,
+                    completed: Boolean(goal.completed),
+                    archivedAt: this._formatDate(new Date()),
+                });
+                if (goal.history.length > 60) goal.history = goal.history.slice(-60);
+                goal.periodKey = currentPeriodKey;
+                goal.currentCount = 0;
+                goal.completed = false;
+                changed = true;
+            });
+            (data[period] || []).forEach(goal => {
+                if (goal.deadline === this._periodResetDate(period, goal.periodKey)) {
+                    goal.deadline = this._periodEndDate(period, goal.periodKey);
+                    changed = true;
+                }
+            });
+        });
+        return changed;
     },
 
     getGoals(period, categoryFilter = 'all') {
@@ -66,9 +148,11 @@ export const MilestoneGoalsV2 = {
             currentCount: 0,
             completed: false,
             category: category || 'personal',
-            deadline: deadline || null,
+            deadline: deadline || this._periodEndDate(period),
             notes: notes || '',
             createdAt: new Date().toISOString().split('T')[0],
+            periodKey: this._periodKey(period),
+            history: [],
         };
 
         data[period].push(newGoal);
@@ -152,12 +236,35 @@ export const MilestoneGoalsV2 = {
         }
     },
 
+    markHistoricalComplete(period, goalId, historyIndex) {
+        const data = this.getData();
+        const goal = (data[period] || []).find(item => item.id === goalId);
+        const record = goal?.history?.[historyIndex];
+        if (!record) return null;
+        record.completed = true;
+        record.retroactive = true;
+        record.currentCount = record.targetCount || 1;
+        this.saveData(data);
+        return record;
+    },
+
     getStats(period) {
         const goals = this.getGoals(period, 'all');
         const total = goals.length;
         const completed = goals.filter(g => g.completed).length;
         const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
         return { total, completed, pct };
+    },
+
+    getProgressStats(period) {
+        const goals = this.getGoals(period, 'all');
+        const total = goals.reduce((sum, goal) => sum + (goal.targetCount > 0 ? goal.targetCount : 1), 0);
+        const current = goals.reduce((sum, goal) => {
+            if (goal.targetCount > 0) return sum + Math.max(0, goal.currentCount || 0);
+            return sum + (goal.completed ? 1 : 0);
+        }, 0);
+        const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+        return { total, current, pct, goals: goals.length };
     },
 
     /** Syncs progress automatically from habits or coding check-ins */

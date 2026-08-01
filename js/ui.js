@@ -157,7 +157,9 @@ export const UIController = {
         const { overallPercentage } = AttendanceCalc.calculateOverallAttendance(subjects);
         const { overallProgressPct } = GoalsCalc.calculateOverallGoalsStats(goals);
         const habits = HabitManager.getData();
-        const overallStreak = HabitManager.getOverallStreak(habits);
+        const overallStreak = typeof HabitManager.getOverallStreak === 'function'
+            ? HabitManager.getOverallStreak(habits)
+            : this.calculateOverallHabitStreak(habits);
 
         const elAtt = document.getElementById('stat-header-attendance');
         const elGoal = document.getElementById('stat-header-goals');
@@ -166,6 +168,33 @@ export const UIController = {
         if (elAtt) elAtt.textContent = `${overallPercentage}%`;
         if (elGoal) elGoal.textContent = `${overallProgressPct}%`;
         if (elStreak) elStreak.textContent = `${overallStreak} 🔥`;
+    },
+
+    calculateOverallHabitStreak(habits) {
+        if (!habits || habits.length === 0) return 0;
+
+        const historySets = habits.map(habit => new Set(habit.history || []));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        let streak = 0;
+
+        for (let daysAgo = 0; daysAgo < 366; daysAgo++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() - daysAgo);
+            const scheduledIndexes = habits.reduce((indexes, habit, index) => {
+                if (HabitManager.isScheduledOnDate(habit, date)) indexes.push(index);
+                return indexes;
+            }, []);
+
+            if (scheduledIndexes.length === 0) continue;
+
+            const dateKey = date.toISOString().split('T')[0];
+            const completed = scheduledIndexes.every(index => historySets[index].has(dateKey));
+            if (!completed) break;
+            streak++;
+        }
+
+        return streak;
     },
 
     renderDashboard(subjects, goals, timetable) {
@@ -331,9 +360,7 @@ export const UIController = {
         // ── Subject overview ─────────────────────────────────────────────
         const subjectBars = subjects.slice(0, 4).map(s => {
             const attendance = AttendanceCalc.calculateSubjectAttendance(s);
-            const subjectAttended = attendance.type === 'lab' ? attendance.labAttended : attendance.theoryAttended;
-            const subjectTotal = attendance.type === 'lab' ? attendance.labTotal : attendance.theoryTotal;
-            const stats = AttendanceCalc.calculateStats(subjectAttended, subjectTotal, s.targetPercentage);
+            const stats = AttendanceCalc.calculateStats(attendance.totalAttended, attendance.totalClasses, s.targetPercentage);
             return `<div style="margin-bottom:10px;">
                 <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px;">
                     <span>${s.name}</span><span style="color:${stats.statusColor}">${stats.percentage}%</span>
@@ -501,7 +528,7 @@ export const UIController = {
                     <div class="attendance-overall-details">
                         <strong>Lab: ${overall.labPercentage ?? 0}%</strong> (${overall.labAttended}/${overall.labTotal})
                         <strong>Theory: ${overall.theoryPercentage ?? 0}%</strong> (${overall.theoryAttended}/${overall.theoryTotal})
-                        <span>Average of lab and theory across all subjects</span>
+                        <span>Overall attendance is the average of lab and theory percentages</span>
                     </div>
                 </div>
                 <div class="progress-bar-bg">
@@ -1848,13 +1875,7 @@ export const UIController = {
 
     // Actions
     logAttendance(subjectId, status, type = 'theory') {
-        const success = this._logAttendance(subjectId, status, type);
-        if (success) {
-            console.debug('[Attendance] Updated', { subjectId, status, type });
-            this.renderAll();
-            console.debug('[Attendance] Rendered all views after update');
-        }
-        return success;
+        this._logAttendance(subjectId, status, type);
     },
 
     _logAttendance(subjectId, status, type = 'theory', options = {}) {

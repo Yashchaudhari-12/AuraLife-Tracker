@@ -3,9 +3,9 @@
  * Independent Core UI + Asynchronous Cloud Sync
  */
 
-import { UIController } from './ui.js';
-import { Storage } from './storage.js';
-import { DataMigration } from './migration.js';
+import { UIController } from './ui.js?v=2026080101';
+import { Storage } from './storage.js?v=2026080101';
+import { DataMigration } from './migration.js?v=2026080101';
 
 DataMigration.runIfNeeded();
 window.appUI = UIController;

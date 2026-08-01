@@ -19,7 +19,8 @@ export const AnalyticsEngine = {
         const barWidth = Math.min(45, (width - padding * 2) / subjects.length - 15);
 
         let barsSVG = subjects.map((s, idx) => {
-            const pct = s.total > 0 ? (s.attended / s.total) * 100 : 0;
+            const attendance = AttendanceCalc.calculateSubjectAttendance(s);
+            const pct = attendance.totalClasses > 0 ? attendance.percentage : 0;
             const barHeight = (pct / 100) * (height - padding * 2);
             const x = padding + idx * ((width - padding * 2) / subjects.length) + 15;
             const y = height - padding - barHeight;

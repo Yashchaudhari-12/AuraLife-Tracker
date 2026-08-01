@@ -50,14 +50,42 @@ body {
 .brand { gap: 13px; }
 .brand-icon {
     width: 44px; height: 44px; border-radius: 13px;
-    background: linear-gradient(145deg, #2ea9d7, #6774df 62%, #9e82e8);
-    box-shadow: 0 8px 24px rgba(75, 112, 220, 0.3);
+    background: linear-gradient(145deg, #101a35, #18234a);
+    border: 1px solid rgba(92, 221, 239, 0.55);
+    box-shadow: 0 8px 24px rgba(35, 183, 220, 0.22), inset 0 1px 0 rgba(255,255,255,0.16);
+    overflow: hidden;
+}
+.brand-icon::before {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 11px;
+    border: 1px solid rgba(111, 239, 230, 0.7);
+    border-left-color: transparent;
+    border-right-color: transparent;
+    border-radius: 50%;
+    transform: rotate(-32deg);
+}
+.brand-mark {
+    position: relative;
+    z-index: 1;
+    color: #f7fbff;
+    font-family: var(--font-heading);
+    font-size: 25px;
+    font-weight: 800;
+    line-height: 1;
+    background: linear-gradient(160deg, #ffffff 22%, #67e8f9 82%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 18px rgba(103, 232, 249, 0.35);
 }
 .brand-icon::after { display: none; }
 .brand-title {
     font-size: 24px;
     letter-spacing: -0.8px;
-    background: linear-gradient(110deg, #ffffff 35%, #b9bdff 100%);
+    background: none;
+    color: #f7f6fb;
+    -webkit-text-fill-color: currentColor;
 }
 .brand-tag { color: #929bff; letter-spacing: 1.05px; font-size: 10px; }
 

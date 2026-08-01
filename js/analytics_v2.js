@@ -9,7 +9,7 @@
  *
  * All charts:
  *   • Pure SVG with viewBox (responsive)
- *   • Read from localStorage (auralife_activity_log, auralife_tasks)
+ *   • Read from localStorage (auralife_activity_log, auralife_tasks, auralife_milestone_goals_v2)
  *   • Handle empty data gracefully
  *   • Use the app's CSS custom-property palette
  */
@@ -35,6 +35,14 @@ export const AnalyticsV2 = {
             };
         } catch (_) {
             return { daily: { tasks: [], history: [] }, weekly: { tasks: [], history: [] }, monthly: { tasks: [], history: [] }, yearly: { tasks: [], history: [] } };
+        }
+    },
+
+    _getMilestoneData() {
+        try {
+            return JSON.parse(localStorage.getItem('auralife_milestone_goals_v2') || 'null') || { weekly: [], monthly: [], yearly: [] };
+        } catch (_) {
+            return { weekly: [], monthly: [], yearly: [] };
         }
     },
 
@@ -418,7 +426,8 @@ export const AnalyticsV2 = {
         const container = document.getElementById(containerId);
         if (!container) return;
 
-        const data = this._getTasksData();
+        const taskData = this._getTasksData();
+        const milestoneData = this._getMilestoneData();
 
         const periods = [
             { key: 'daily',   label: 'Daily',   color: '#06b6d4', icon: '☀️'  },
@@ -441,11 +450,20 @@ export const AnalyticsV2 = {
         let defs  = '';
 
         periods.forEach((p, i) => {
-            const pd        = data[p.key] || { tasks: [], history: [] };
-            const total     = (pd.tasks || []).length;
-            const completed = (pd.tasks || []).filter(t => t.completed).length;
+            const milestoneGoals = milestoneData[p.key] || [];
+            const pd        = taskData[p.key] || { tasks: [], history: [] };
+            const total     = p.key === 'daily'
+                ? (pd.tasks || []).length
+                : milestoneGoals.reduce((sum, goal) => sum + (goal.targetCount > 0 ? goal.targetCount : 1), 0);
+            const completed = p.key === 'daily'
+                ? (pd.tasks || []).filter(t => t.completed).length
+                : milestoneGoals.reduce((sum, goal) => {
+                    if (goal.targetCount > 0) return sum + Math.max(0, goal.currentCount || 0);
+                    return sum + (goal.completed ? 1 : 0);
+                }, 0);
             const pct       = total > 0 ? Math.round((completed / total) * 100) : 0;
-            const offset    = circ - (pct / 100) * circ;
+            const visualPct = Math.min(100, pct);
+            const offset    = circ - (visualPct / 100) * circ;
             const gradId    = `ringGrad-${i}`;
             const cx_       = cx(i);
 
@@ -480,7 +498,7 @@ export const AnalyticsV2 = {
                 <text x="${cx_}" y="${cy + R + 18}" text-anchor="middle"
                       fill="#9ca3af" font-size="11" font-weight="600"
                       font-family="Inter, sans-serif">${p.icon} ${p.label}</text>
-                <!-- Fraction below label -->
+                <!-- Current progress toward the period target -->
                 <text x="${cx_}" y="${cy + R + 32}" text-anchor="middle"
                       fill="#6b7280" font-size="10"
                       font-family="Inter, sans-serif">${completed}/${total}</text>

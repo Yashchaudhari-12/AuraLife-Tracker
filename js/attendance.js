@@ -51,7 +51,9 @@ export const AttendanceCalc = {
                 statusColor = '#f59e0b'; // Amber
             }
 
-            message = `⚠️ Attend ${requiredClasses} consecutive class${requiredClasses > 1 ? 'es' : ''} to reach ${targetPercentage}%.`;
+            message = requiredClasses > 0
+                ? `⚠️ Attend the next ${requiredClasses} class${requiredClasses > 1 ? 'es' : ''} in a row to reach ${targetPercentage}%.`
+                : `⚠️ You need to attend the next class to reach ${targetPercentage}%.`;
         }
 
         return {
@@ -64,14 +66,57 @@ export const AttendanceCalc = {
         };
     },
 
+    calculateSubjectAttendance(subject) {
+        const isLab = this.getSubjectType(subject) === 'lab';
+        const labAttended = isLab ? (subject.labAttended ?? subject.attended ?? 0) : 0;
+        const labTotal = isLab ? (subject.labTotal ?? subject.total ?? 0) : 0;
+        const theoryAttended = isLab ? 0 : (subject.theoryAttended ?? subject.attended ?? 0);
+        const theoryTotal = isLab ? 0 : (subject.theoryTotal ?? subject.total ?? 0);
+        const labPercentage = labTotal > 0 ? Number(((labAttended / labTotal) * 100).toFixed(1)) : null;
+        const theoryPercentage = theoryTotal > 0 ? Number(((theoryAttended / theoryTotal) * 100).toFixed(1)) : null;
+        const totalAttended = labAttended + theoryAttended;
+        const totalClasses = labTotal + theoryTotal;
+        const percentage = totalClasses > 0
+            ? Number(((totalAttended / totalClasses) * 100).toFixed(1))
+            : 0;
+
+        return {
+            type: isLab ? 'lab' : 'theory',
+            labAttended, labTotal, labPercentage,
+            theoryAttended, theoryTotal, theoryPercentage,
+            totalAttended, totalClasses, percentage
+        };
+    },
+
+    getSubjectType(subject) {
+        const subjectText = `${subject.name || ''} ${subject.code || ''}`;
+        return /(^|[^a-z])(dsal|oopl)([^a-z]|$)/i.test(subjectText) ? 'lab' : 'theory';
+    },
+
     calculateOverallAttendance(subjects) {
         if (!subjects || subjects.length === 0) {
-            return { totalAttended: 0, totalClasses: 0, overallPercentage: 0 };
+            return { labAttended: 0, labTotal: 0, theoryAttended: 0, theoryTotal: 0, totalAttended: 0, totalClasses: 0, labPercentage: null, theoryPercentage: null, overallPercentage: 0 };
         }
-        const totalAttended = subjects.reduce((acc, s) => acc + (s.attended || 0), 0);
-        const totalClasses = subjects.reduce((acc, s) => acc + (s.total || 0), 0);
-        const overallPercentage = totalClasses > 0 ? Number(((totalAttended / totalClasses) * 100).toFixed(1)) : 0;
+        const totals = subjects.reduce((acc, subject) => {
+            const stats = this.calculateSubjectAttendance(subject);
+            acc.labAttended += stats.labAttended;
+            acc.labTotal += stats.labTotal;
+            acc.theoryAttended += stats.theoryAttended;
+            acc.theoryTotal += stats.theoryTotal;
+            acc.totalAttended += stats.labAttended + stats.theoryAttended;
+            acc.totalClasses += stats.labTotal + stats.theoryTotal;
+            return acc;
+        }, { labAttended: 0, labTotal: 0, theoryAttended: 0, theoryTotal: 0, totalAttended: 0, totalClasses: 0 });
+        const labPercentage = totals.labTotal > 0 ? Number(((totals.labAttended / totals.labTotal) * 100).toFixed(1)) : null;
+        const theoryPercentage = totals.theoryTotal > 0 ? Number(((totals.theoryAttended / totals.theoryTotal) * 100).toFixed(1)) : null;
+        const overallPercentage = labPercentage !== null && theoryPercentage !== null
+            ? Number(((labPercentage + theoryPercentage) / 2).toFixed(1))
+            : labPercentage !== null
+                ? labPercentage
+                : theoryPercentage !== null
+                    ? theoryPercentage
+                    : 0;
 
-        return { totalAttended, totalClasses, overallPercentage };
+        return { ...totals, labPercentage, theoryPercentage, overallPercentage };
     }
 };
