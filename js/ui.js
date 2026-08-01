@@ -70,6 +70,7 @@ export const UIController = {
         document.getElementById('btn-add-subject')?.addEventListener('click', () => this.openModal('modal-add-subject'));
         document.getElementById('btn-add-goal')?.addEventListener('click', () => this.openModal('modal-add-goal'));
         document.getElementById('btn-add-slot')?.addEventListener('click', () => this.openAddSlotForDay());
+        document.getElementById('btn-attend-today')?.addEventListener('click', () => this.markScheduleDayAttended());
         document.getElementById('btn-export-backup')?.addEventListener('click', () => Storage.exportData());
         document.getElementById('btn-clear-all')?.addEventListener('click', () => this.clearAllData());
         
@@ -137,6 +138,8 @@ export const UIController = {
             this.renderFocusTab();
         } else if (this.currentTab === 'habits') {
             this.renderHabitsTab();
+        } else if (this.currentTab === 'week') {
+            this.renderWeekTab();
         } else if (this.currentTab === 'goals-v2') {
             this.renderGoalsV2Tab();
         } else if (this.currentTab === 'attendance') {
@@ -152,7 +155,9 @@ export const UIController = {
 
     renderHeaderStats(subjects, goals) {
         const { overallPercentage } = AttendanceCalc.calculateOverallAttendance(subjects);
-        const { overallProgressPct, activeStreaks } = GoalsCalc.calculateOverallGoalsStats(goals);
+        const { overallProgressPct } = GoalsCalc.calculateOverallGoalsStats(goals);
+        const habits = HabitManager.getData();
+        const overallStreak = HabitManager.getOverallStreak(habits);
 
         const elAtt = document.getElementById('stat-header-attendance');
         const elGoal = document.getElementById('stat-header-goals');
@@ -160,7 +165,7 @@ export const UIController = {
 
         if (elAtt) elAtt.textContent = `${overallPercentage}%`;
         if (elGoal) elGoal.textContent = `${overallProgressPct}%`;
-        if (elStreak) elStreak.textContent = `${activeStreaks} 🔥`;
+        if (elStreak) elStreak.textContent = `${overallStreak} 🔥`;
     },
 
     renderDashboard(subjects, goals, timetable) {
@@ -181,8 +186,10 @@ export const UIController = {
         const todaySummary  = XPSystem.getTodaySummary();
 
         const habits        = HabitManager.getData();
+        const todayHabits   = HabitManager.getScheduledForToday(habits);
         const habitStats    = HabitManager.getTodayStats(habits);
-        const focusStats    = TodaysFocus.getStats();
+        const focusItems    = this.getTodayFocusItems();
+        const focusStats    = this.getTodayFocusStats(focusItems);
         const codingStats   = CodingDashboard.getData();
         const codingStreak  = CodingDashboard.getCodingStreak();
         const codingWeek    = CodingDashboard.getProblemsThisWeek();
@@ -273,22 +280,21 @@ export const UIController = {
         </div>`;
 
         // ── Today's Focus HTML ───────────────────────────────────────────
-        const focusItems = TodaysFocus.getData();
         const focusHTML = focusItems.length === 0
             ? `<div style="color:var(--text-muted);font-size:13px;padding:12px 0;">No focus tasks added for today. <a href="#" onclick="window.appUI.switchTab('focus');return false;" style="color:var(--primary-cyan);">+ Add Today's Focus →</a></div>`
             : focusItems.slice(0, 5).map(f => `
                 <div class="focus-item-row ${f.completed ? 'completed' : ''}">
                     <div style="display:flex;align-items:center;gap:10px;">
-                        <input type="checkbox" ${f.completed ? 'checked' : ''} onclick="window.appUI.toggleFocusItem('${f.id}')" style="cursor:pointer;width:16px;height:16px;accent-color:#06b6d4;">
+                        <input type="checkbox" ${f.completed ? 'checked' : ''} onclick="window.appUI.toggleFocusItem('${f.id}', '${f.kind}')" style="cursor:pointer;width:16px;height:16px;accent-color:#06b6d4;">
                         <span style="font-size:14px;color:white;">${this._escapeHtml(f.text)}</span>
                     </div>
                     <button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;" onclick="window.appUI.deleteFocusItem('${f.id}')">✕</button>
                 </div>`).join('');
 
         // ── Today's Habits HTML ─────────────────────────────────────────
-        const habitsHTML = habits.length === 0
+        const habitsHTML = todayHabits.length === 0
             ? `<div style="color:var(--text-muted);font-size:13px;padding:12px 0;">No daily habits yet. <a href="#" onclick="window.appUI.switchTab('habits');return false;" style="color:var(--primary-cyan);">+ Add Habits →</a></div>`
-            : habits.slice(0, 5).map(h => {
+            : todayHabits.slice(0, 5).map(h => {
                 const checked = (h.history || []).includes(today);
                 const streak  = HabitManager.calculateStreak(h.history || []);
                 return `<div class="habit-item">
@@ -480,7 +486,26 @@ export const UIController = {
 
     renderAttendanceTab(subjects = Storage.getSubjects()) {
         const container = document.getElementById('attendance-subjects-grid');
+        const overallContainer = document.getElementById('attendance-overall');
         if (!container) return;
+
+        const overall = AttendanceCalc.calculateOverallAttendance(subjects);
+        if (overallContainer) {
+            overallContainer.innerHTML = `
+                <div class="attendance-overall-label">Overall College Attendance</div>
+                <div class="attendance-overall-content">
+                    <div class="attendance-overall-percentage">${overall.overallPercentage}%</div>
+                    <div class="attendance-overall-details">
+                        <strong>Lab: ${overall.labPercentage ?? 0}%</strong> (${overall.labAttended}/${overall.labTotal})
+                        <strong>Theory: ${overall.theoryPercentage ?? 0}%</strong> (${overall.theoryAttended}/${overall.theoryTotal})
+                        <span>Average of lab and theory across all subjects</span>
+                    </div>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" style="width: ${Math.min(100, overall.overallPercentage)}%; background: var(--primary-cyan);"></div>
+                </div>
+            `;
+        }
 
         if (subjects.length === 0) {
             container.innerHTML = `
@@ -494,7 +519,15 @@ export const UIController = {
         }
 
         container.innerHTML = subjects.map(s => {
-            const stats = AttendanceCalc.calculateStats(s.attended, s.total, s.targetPercentage);
+            const attendance = AttendanceCalc.calculateSubjectAttendance(s);
+            const attendanceType = attendance.type;
+            const subjectAttended = attendanceType === 'lab' ? attendance.labAttended : attendance.theoryAttended;
+            const subjectTotal = attendanceType === 'lab' ? attendance.labTotal : attendance.theoryTotal;
+            const stats = AttendanceCalc.calculateStats(
+                subjectAttended,
+                subjectTotal,
+                s.targetPercentage
+            );
             const isSafe = stats.status === 'SAFE';
 
             return `
@@ -512,7 +545,8 @@ export const UIController = {
                     <div class="subject-stats-row">
                         <div class="subject-percentage-big">${stats.percentage}%</div>
                         <div class="subject-ratio">
-                            Attended: <strong>${s.attended}</strong> / ${s.total}
+                            ${attendanceType === 'lab' ? 'Lab' : 'Theory'}: <strong>${attendanceType === 'lab' ? (attendance.labPercentage ?? 0) : (attendance.theoryPercentage ?? 0)}%</strong>
+                            (${attendanceType === 'lab' ? attendance.labAttended : attendance.theoryAttended}/${attendanceType === 'lab' ? attendance.labTotal : attendance.theoryTotal})
                         </div>
                     </div>
 
@@ -525,9 +559,9 @@ export const UIController = {
                     </div>
 
                     <div class="subject-action-bar">
-                        <button class="btn-attendance btn-present" onclick="window.appUI.logAttendance('${s.id}', 'present')">+ Present</button>
-                        <button class="btn-attendance btn-absent" onclick="window.appUI.logAttendance('${s.id}', 'absent')">+ Absent</button>
-                        <button class="btn-attendance btn-cancel" onclick="window.appUI.logAttendance('${s.id}', 'cancel')">Cancelled</button>
+                        <button class="btn-attendance btn-present" onclick="window.appUI.logAttendance('${s.id}', 'present', '${attendanceType}')">+ ${attendanceType === 'lab' ? 'Lab' : 'Theory'} Present</button>
+                        <button class="btn-attendance btn-absent" onclick="window.appUI.logAttendance('${s.id}', 'absent', '${attendanceType}')">+ ${attendanceType === 'lab' ? 'Lab' : 'Theory'} Absent</button>
+                        <button class="btn-attendance btn-cancel" onclick="window.appUI.logAttendance('${s.id}', 'cancel', '${attendanceType}')">${attendanceType === 'lab' ? 'Lab' : 'Theory'} Cancelled</button>
                     </div>
 
                     <div style="display: flex; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-glass);">
@@ -769,7 +803,8 @@ export const UIController = {
         const root = document.getElementById('habits-tab-root');
         if (!root) return;
 
-        const habits = HabitManager.getData();
+        const allHabits = HabitManager.getData();
+        const habits = allHabits.filter(habit => !Array.isArray(habit.weekdays) || habit.weekdays.length === 0 || habit.weekdays.length === 7);
         const todayStats = HabitManager.getTodayStats(habits);
         const today = HabitManager.todayKey();
 
@@ -812,9 +847,9 @@ export const UIController = {
             cardsHTML = `
                 <div class="habits-empty">
                     <span class="habits-empty-icon">🔥</span>
-                    <div class="habits-empty-title">No habits yet</div>
+                    <div class="habits-empty-title">No daily habits yet</div>
                     <div class="habits-empty-sub">
-                        Add your non-negotiable daily habits — things you commit to every single day regardless of anything else.
+                        Daily habits live here. Weekly or occasional items are managed in Weekly Rituals and appear in Today’s Focus as scheduled tasks.
                     </div>
                     <button class="btn btn-primary" onclick="window.appUI.openAddHabitModal()">
                         + Add Your First Habit
@@ -890,6 +925,59 @@ export const UIController = {
         `;
     },
 
+    renderWeekTab() {
+        const root = document.getElementById('week-tab-root');
+        if (!root) return;
+
+        const habits = HabitManager.getData();
+        const days = [
+            { index: 1, short: 'Mon', name: 'Monday' },
+            { index: 2, short: 'Tue', name: 'Tuesday' },
+            { index: 3, short: 'Wed', name: 'Wednesday' },
+            { index: 4, short: 'Thu', name: 'Thursday' },
+            { index: 5, short: 'Fri', name: 'Friday' },
+            { index: 6, short: 'Sat', name: 'Saturday' },
+            { index: 0, short: 'Sun', name: 'Sunday' },
+        ];
+        const todayIndex = new Date().getDay();
+        const todayKey = HabitManager.todayKey();
+
+        const dayColumns = days.map(day => {
+            const dayHabits = habits.filter(h => !Array.isArray(h.weekdays) || h.weekdays.length === 0 || h.weekdays.includes(day.index));
+            const items = dayHabits.length === 0
+                ? '<div class="week-empty-day">Nothing planned</div>'
+                : dayHabits.map(h => {
+                    const checked = (h.history || []).includes(todayKey) && day.index === todayIndex;
+                    return `<div class="week-habit-item ${checked ? 'is-done' : ''}" style="--habit-color:${h.color || '#06b6d4'}">
+                        <span class="week-habit-icon">${h.icon || '⭐'}</span>
+                        <span class="week-habit-name">${this._escapeHtml(h.name)}</span>
+                        ${day.index === todayIndex ? `<button class="week-check-btn" onclick="window.appUI.toggleHabitToday('${h.id}')" title="${checked ? 'Undo completion' : 'Mark done'}">${checked ? '✓' : '○'}</button>` : ''}
+                    </div>`;
+                }).join('');
+            return `<section class="week-day-column ${day.index === todayIndex ? 'is-today' : ''}">
+                <div class="week-day-heading"><span>${day.short}</span>${day.index === todayIndex ? '<em>Today</em>' : ''}</div>
+                <div class="week-day-date">${day.name}</div>
+                <div class="week-day-list">${items}</div>
+            </section>`;
+        }).join('');
+
+        root.innerHTML = `<div class="week-header">
+                <div><div class="week-title">🗓️ Weekly Rituals</div><div class="week-subtitle">Plan the rituals that belong to each day, then check them off when they happen.</div></div>
+                <button class="btn btn-primary" onclick="window.appUI.openAddHabitModal()">+ Add Habit</button>
+            </div>
+            <div class="week-board">${dayColumns}</div>
+            <div class="week-settings">
+                <div class="week-settings-heading"><div><h3>Habit schedule</h3><p>Choose the days each habit belongs to. An unassigned habit stays daily.</p></div></div>
+                ${habits.length === 0 ? '<div class="week-empty-state">Add your first habit to start building your week.</div>' : habits.map(h => {
+                    const selected = Array.isArray(h.weekdays) ? h.weekdays : [];
+                    return `<div class="week-schedule-row" style="--habit-color:${h.color || '#06b6d4'}">
+                        <div class="week-schedule-name"><span>${h.icon || '⭐'}</span><strong>${this._escapeHtml(h.name)}</strong></div>
+                        <div class="week-day-toggles">${days.map(day => `<button class="week-day-toggle ${selected.length === 0 || selected.includes(day.index) ? 'selected' : ''}" onclick="window.appUI.toggleHabitWeekday('${h.id}', ${day.index})" title="${day.name}">${day.short}</button>`).join('')}</div>
+                    </div>`;
+                }).join('')}
+            </div>`;
+    },
+
     openAddHabitModal() {
         const fieldName = document.getElementById('field-habit-name');
         if (fieldName) fieldName.value = '';
@@ -920,6 +1008,12 @@ export const UIController = {
                 </div>`).join('');
         }
 
+        const weekdayPicker = document.getElementById('habit-weekday-picker');
+        if (weekdayPicker) {
+            const days = [['Mon', 1], ['Tue', 2], ['Wed', 3], ['Thu', 4], ['Fri', 5], ['Sat', 6], ['Sun', 0]];
+            weekdayPicker.innerHTML = days.map(([label, value]) => `<label class="weekday-option"><input type="checkbox" value="${value}" checked><span>${label}</span></label>`).join('');
+        }
+
         this.openModal('modal-add-habit');
         setTimeout(() => { if (fieldName) fieldName.focus(); }, 150);
     },
@@ -929,15 +1023,17 @@ export const UIController = {
         const name  = document.getElementById('field-habit-name')?.value?.trim();
         const icon  = document.getElementById('field-habit-icon')?.value || '⭐';
         const color = document.getElementById('field-habit-color')?.value || '#06b6d4';
+        const weekdays = [...document.querySelectorAll('#habit-weekday-picker input:checked')].map(input => Number(input.value));
         if (!name) return;
 
-        HabitManager.addHabit(name, icon, color);
+        HabitManager.addHabit(name, icon, color, weekdays);
         XPSystem.earn('new_goal'); // +2 XP
         this.closeModal('modal-add-habit');
         e.target.reset();
 
         this.showToast(`Habit "${name}" added! (+2 XP)`, 'success');
         this.renderHabitsTab();
+        this.renderWeekTab();
         this.renderDashboard(Storage.getSubjects(), Storage.getGoals(), TimetableManager.getData());
     },
 
@@ -959,7 +1055,17 @@ export const UIController = {
             MilestoneGoalsV2.syncProgressFromKeyword(habit.name, -1);
         }
         this.renderHabitsTab();
+        this.renderWeekTab();
         this.renderGoalsV2Tab();
+    },
+
+    toggleHabitWeekday(habitId, dayIndex) {
+        const habit = HabitManager.getData().find(h => h.id === habitId);
+        if (!habit) return;
+        const current = Array.isArray(habit.weekdays) && habit.weekdays.length > 0 ? [...habit.weekdays] : [0, 1, 2, 3, 4, 5, 6];
+        const next = current.includes(dayIndex) ? current.filter(day => day !== dayIndex) : [...current, dayIndex];
+        HabitManager.updateWeekdays(habitId, next);
+        this.renderWeekTab();
     },
 
     deleteHabit(habitId) {
@@ -1262,32 +1368,47 @@ export const UIController = {
         const root = document.getElementById('focus-root');
         if (!root) return;
 
-        const items = TodaysFocus.getData();
-        const stats = TodaysFocus.getStats();
+        const scheduledHabits = HabitManager.getScheduledForToday(HabitManager.getData());
+        const dailyHabits = scheduledHabits.filter(habit => !Array.isArray(habit.weekdays) || habit.weekdays.length === 0 || habit.weekdays.length === 7);
+        const scheduledTasks = scheduledHabits.filter(habit => Array.isArray(habit.weekdays) && habit.weekdays.length > 0 && habit.weekdays.length < 7);
+        const manualTasks = TodaysFocus.getData().map(item => ({ ...item, kind: 'manual' }));
+        const recurringTaskItems = scheduledTasks.map(habit => ({
+            id: habit.id,
+            text: `${habit.icon || '⭐'} ${habit.name}`,
+            completed: HabitManager.isCheckedToday(habit),
+            kind: 'habit-task',
+        }));
+        const tasks = [...recurringTaskItems, ...manualTasks];
+        const habits = dailyHabits.map(habit => ({
+            id: habit.id,
+            text: `${habit.icon || '⭐'} ${habit.name}`,
+            completed: HabitManager.isCheckedToday(habit),
+            kind: 'habit',
+        }));
+        const items = [...habits, ...tasks];
+        const stats = this.getTodayFocusStats(items);
 
-        const itemsHTML = items.length === 0
-            ? `<div style="text-align:center;padding:50px 20px;color:var(--text-muted);">
-                <div style="font-size:42px;margin-bottom:12px;">⚡</div>
-                <div style="font-family:var(--font-heading);font-size:20px;font-weight:700;color:white;">No focus items for today</div>
-                <div style="font-size:13px;margin-top:6px;">Add non-recurring tasks you want to accomplish today (e.g. Buy groceries, Call Mom, Finish DBMS assignment).</div>
-            </div>`
-            : items.map(item => `
+        const renderFocusRows = (list, emptyText) => list.length === 0
+            ? `<div class="focus-section-empty">${emptyText}</div>`
+            : list.map(item => `
                 <div class="focus-item-row ${item.completed ? 'completed' : ''}">
                     <div style="display:flex;align-items:center;gap:12px;flex:1;">
                         <input type="checkbox" ${item.completed ? 'checked' : ''}
-                               onclick="window.appUI.toggleFocusItem('${item.id}')"
+                               onclick="window.appUI.toggleFocusItem('${item.id}', '${item.kind}')"
                                style="width:18px;height:18px;cursor:pointer;accent-color:#06b6d4;">
                         <span style="font-size:15px;color:white;font-weight:500;">${this._escapeHtml(item.text)}</span>
                     </div>
-                    <button class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:12px;color:#ef4444;"
-                            onclick="window.appUI.deleteFocusItem('${item.id}')">✕</button>
+                    ${item.kind === 'manual' ? `<button class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:12px;color:#ef4444;" onclick="window.appUI.deleteFocusItem('${item.id}')">✕</button>` : `<span class="focus-recurring-label">${item.kind === 'habit-task' ? 'Scheduled task' : 'Daily habit'}</span>`}
                 </div>`).join('');
+
+        const taskStats = this.getTodayFocusStats(tasks);
+        const habitStats = this.getTodayFocusStats(habits);
 
         root.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:16px;">
             <div>
                 <h2 style="font-family:var(--font-heading);font-size:24px;font-weight:800;">⚡ Today's Focus</h2>
-                <p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Non-recurring important tasks for today. Resets daily.</p>
+                <p style="font-size:13px;color:var(--text-muted);margin-top:4px;">One-time tasks plus recurring habits scheduled for today.</p>
             </div>
             <div style="display:flex;align-items:center;gap:16px;">
                 <div style="text-align:right;">
@@ -1304,9 +1425,17 @@ export const UIController = {
             </form>
         </div>
 
-        <div class="glass-panel">
-            <div class="dashboard-widget-title"><span>📋 Today's Tasks</span><span style="font-size:12px;color:var(--text-muted);">${stats.pct}% done</span></div>
-            ${itemsHTML}
+        <div class="focus-columns">
+            <div class="glass-panel focus-section-panel">
+                <div class="dashboard-widget-title"><span>📋 Tasks</span><span style="font-size:12px;color:var(--text-muted);">${taskStats.completed}/${taskStats.total} done</span></div>
+                <div class="focus-section-subtitle">One-time tasks and non-daily scheduled habits.</div>
+                ${renderFocusRows(tasks, 'No tasks for today. Add one above.')}
+            </div>
+            <div class="glass-panel focus-section-panel">
+                <div class="dashboard-widget-title"><span>🔁 Habits</span><span style="font-size:12px;color:var(--text-muted);">${habitStats.completed}/${habitStats.total} done</span></div>
+                <div class="focus-section-subtitle">Habits scheduled every day.</div>
+                ${renderFocusRows(habits, 'No habits scheduled for today.')}
+            </div>
         </div>
         `;
     },
@@ -1322,7 +1451,29 @@ export const UIController = {
         this.renderFocusTab();
     },
 
-    toggleFocusItem(id) {
+    getTodayFocusItems() {
+        const manualItems = TodaysFocus.getData().map(item => ({ ...item, kind: 'manual' }));
+        const recurringItems = HabitManager.getScheduledForToday(HabitManager.getData()).map(habit => ({
+            id: habit.id,
+            text: `${habit.icon || '⭐'} ${habit.name}`,
+            completed: HabitManager.isCheckedToday(habit),
+            kind: 'habit',
+        }));
+        return [...recurringItems, ...manualItems];
+    },
+
+    getTodayFocusStats(items) {
+        const total = items.length;
+        const completed = items.filter(item => item.completed).length;
+        return { total, completed, pct: total > 0 ? Math.round((completed / total) * 100) : 0 };
+    },
+
+    toggleFocusItem(id, kind = 'manual') {
+        if (kind === 'habit' || kind === 'habit-task') {
+            this.toggleHabitToday(id);
+            this.renderAll();
+            return;
+        }
         const item = TodaysFocus.toggleItem(id);
         if (item && item.completed) {
             XPSystem.earn('habit_check'); // +3 XP
@@ -1349,12 +1500,15 @@ export const UIController = {
         const monthlyGoals = MilestoneGoalsV2.getGoals('monthly', catFilter);
         const yearlyGoals = MilestoneGoalsV2.getGoals('yearly', catFilter);
 
-        const wStats = MilestoneGoalsV2.getStats('weekly');
-        const mStats = MilestoneGoalsV2.getStats('monthly');
-        const yStats = MilestoneGoalsV2.getStats('yearly');
+        const wStats = MilestoneGoalsV2.getProgressStats('weekly');
+        const mStats = MilestoneGoalsV2.getProgressStats('monthly');
+        const yStats = MilestoneGoalsV2.getProgressStats('yearly');
+        const historyGroups = ['weekly', 'monthly', 'yearly'].flatMap(period =>
+            MilestoneGoalsV2.getGoals(period).flatMap(goal => (goal.history || []).map((record, index) => ({ period, goal, record, index })))
+        ).sort((a, b) => String(b.record.periodKey).localeCompare(String(a.record.periodKey)));
 
         const totalAll = wStats.total + mStats.total + yStats.total;
-        const completedAll = wStats.completed + mStats.completed + yStats.completed;
+        const completedAll = wStats.current + mStats.current + yStats.current;
         const overallPct = totalAll > 0 ? Math.round((completedAll / totalAll) * 100) : 0;
 
         const cats = MilestoneGoalsV2.CATEGORIES;
@@ -1384,7 +1538,8 @@ export const UIController = {
                 const hasCounter = g.targetCount && g.targetCount > 0;
                 const cur = g.currentCount || 0;
                 const tgt = g.targetCount || 1;
-                const pct = hasCounter ? Math.min(100, Math.round((cur / tgt) * 100)) : (g.completed ? 100 : 0);
+                const pct = hasCounter ? Math.round((cur / tgt) * 100) : (g.completed ? 100 : 0);
+                const visualPct = Math.min(100, pct);
                 const color = pct >= 100 ? '#10b981' : pct >= 50 ? '#f59e0b' : catMeta.color;
 
                 return `
@@ -1400,25 +1555,27 @@ export const UIController = {
                                     <div class="goal-progress-num" style="color:${color}">${cur}<span style="font-size:13px;color:var(--text-muted);">/${tgt}</span></div>
                                     <div style="font-size:11px;font-weight:700;color:${color}">${pct}%</div>
                                 ` : `
-                                    <button class="btn btn-sm ${g.completed ? 'btn-secondary' : 'btn-primary'}" onclick="window.appUI.toggleGoalV2('${period}','${g.id}')">
-                                        ${g.completed ? '✓ Done' : 'Mark Done'}
-                                    </button>
+                                    <div class="goal-progress-num" style="color:${color}">${g.completed ? 1 : 0}<span style="font-size:13px;color:var(--text-muted);">/1</span></div>
+                                    <div style="font-size:11px;font-weight:700;color:${color}">${pct}%</div>
                                 `}
                             </div>
                         </div>
 
+                        <div class="goal-progress-bar-bg">
+                            <div class="goal-progress-bar-fill" style="width:${visualPct}%;background:${color};"></div>
+                        </div>
+
                         ${hasCounter ? `
-                            <div class="goal-progress-bar-bg">
-                                <div class="goal-progress-bar-fill" style="width:${pct}%;background:${color};"></div>
-                            </div>
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                                 <div style="display:flex;gap:6px;">
                                     <button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="window.appUI.stepGoalV2('${period}','${g.id}', -1)">-1</button>
                                     <button class="btn btn-primary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="window.appUI.stepGoalV2('${period}','${g.id}', 1)">+1 Progress</button>
                                 </div>
-                                <span style="font-size:11px;color:var(--text-muted);">${tgt - cur > 0 ? `${tgt - cur} remaining` : '🎉 Milestone Achieved!'}</span>
+                                <span style="font-size:11px;color:var(--text-muted);">${tgt - cur > 0 ? `${tgt - cur} remaining` : cur > tgt ? `${cur - tgt} over target` : '🎉 Milestone Achieved!'}</span>
                             </div>
-                        ` : ''}
+                        ` : `<button class="btn btn-sm ${g.completed ? 'btn-secondary' : 'btn-primary'}" style="margin-top:10px;" onclick="window.appUI.toggleGoalV2('${period}','${g.id}')">
+                            ${g.completed ? '✓ Done' : 'Mark Done'}
+                        </button>`}
 
                         ${g.notes ? `
                             <div class="goal-notes-box">
@@ -1455,30 +1612,30 @@ export const UIController = {
                 <div style="background:rgba(0,0,0,0.2);padding:12px 16px;border-radius:12px;border:1px solid rgba(255,255,255,0.05);">
                     <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:6px;">
                         <span>📅 Weekly Goals</span>
-                        <span style="font-weight:700;color:white;">${wStats.completed}/${wStats.total} (${wStats.pct}%)</span>
+                        <span style="font-weight:700;color:white;">${wStats.current}/${wStats.total} (${wStats.pct}%)</span>
                     </div>
                     <div style="height:6px;background:rgba(255,255,255,0.1);border-radius:999px;overflow:hidden;">
-                        <div style="height:100%;width:${wStats.pct}%;background:#06b6d4;border-radius:999px;"></div>
+                        <div style="height:100%;width:${Math.min(100, wStats.pct)}%;background:#06b6d4;border-radius:999px;"></div>
                     </div>
                 </div>
 
                 <div style="background:rgba(0,0,0,0.2);padding:12px 16px;border-radius:12px;border:1px solid rgba(255,255,255,0.05);">
                     <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:6px;">
                         <span>🗓️ Monthly Goals</span>
-                        <span style="font-weight:700;color:white;">${mStats.completed}/${mStats.total} (${mStats.pct}%)</span>
+                        <span style="font-weight:700;color:white;">${mStats.current}/${mStats.total} (${mStats.pct}%)</span>
                     </div>
                     <div style="height:6px;background:rgba(255,255,255,0.1);border-radius:999px;overflow:hidden;">
-                        <div style="height:100%;width:${mStats.pct}%;background:#8b5cf6;border-radius:999px;"></div>
+                        <div style="height:100%;width:${Math.min(100, mStats.pct)}%;background:#8b5cf6;border-radius:999px;"></div>
                     </div>
                 </div>
 
                 <div style="background:rgba(0,0,0,0.2);padding:12px 16px;border-radius:12px;border:1px solid rgba(255,255,255,0.05);">
                     <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:6px;">
                         <span>🏆 Yearly Goals</span>
-                        <span style="font-weight:700;color:white;">${yStats.completed}/${yStats.total} (${yStats.pct}%)</span>
+                        <span style="font-weight:700;color:white;">${yStats.current}/${yStats.total} (${yStats.pct}%)</span>
                     </div>
                     <div style="height:6px;background:rgba(255,255,255,0.1);border-radius:999px;overflow:hidden;">
-                        <div style="height:100%;width:${yStats.pct}%;background:#f59e0b;border-radius:999px;"></div>
+                        <div style="height:100%;width:${Math.min(100, yStats.pct)}%;background:#f59e0b;border-radius:999px;"></div>
                     </div>
                 </div>
             </div>
@@ -1493,7 +1650,7 @@ export const UIController = {
         <div style="margin-bottom:32px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <h3 style="font-family:var(--font-heading);font-size:18px;font-weight:700;color:white;display:flex;align-items:center;gap:8px;">
-                    📅 Weekly Goals <span style="font-size:12px;font-weight:600;color:var(--text-muted);">(${weeklyGoals.length})</span>
+                    📅 Weekly Goals <span style="font-size:11px;font-weight:600;color:var(--text-muted);">(${weeklyGoals.length}) · resets Monday 12:00 AM</span>
                 </h3>
             </div>
             ${renderGoalCardsList(weeklyGoals, 'weekly', 'Weekly Goal')}
@@ -1503,7 +1660,7 @@ export const UIController = {
         <div style="margin-bottom:32px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <h3 style="font-family:var(--font-heading);font-size:18px;font-weight:700;color:white;display:flex;align-items:center;gap:8px;">
-                    🗓️ Monthly Goals <span style="font-size:12px;font-weight:600;color:var(--text-muted);">(${monthlyGoals.length})</span>
+                    🗓️ Monthly Goals <span style="font-size:11px;font-weight:600;color:var(--text-muted);">(${monthlyGoals.length}) · resets on the 1st at 12:00 AM</span>
                 </h3>
             </div>
             ${renderGoalCardsList(monthlyGoals, 'monthly', 'Monthly Goal')}
@@ -1513,10 +1670,22 @@ export const UIController = {
         <div style="margin-bottom:32px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <h3 style="font-family:var(--font-heading);font-size:18px;font-weight:700;color:white;display:flex;align-items:center;gap:8px;">
-                    🏆 Yearly Goals <span style="font-size:12px;font-weight:600;color:var(--text-muted);">(${yearlyGoals.length})</span>
+                    🏆 Yearly Goals <span style="font-size:11px;font-weight:600;color:var(--text-muted);">(${yearlyGoals.length}) · resets January 1 at 12:00 AM</span>
                 </h3>
             </div>
             ${renderGoalCardsList(yearlyGoals, 'yearly', 'Yearly Goal')}
+        </div>
+
+        <!-- Goal History -->
+        <div class="goal-history-panel">
+            <div class="goal-history-heading">
+                <div><h3>🕘 Goal History</h3><p>Previous periods are archived when they reset. Retroactive updates stay in history and do not change current progress.</p></div>
+            </div>
+            ${historyGroups.length === 0 ? '<div class="goal-history-empty">No completed periods yet. Your first archived week will appear here after the next reset.</div>' : historyGroups.slice(0, 24).map(({ period, goal, record, index }) => `
+                <div class="goal-history-row">
+                    <div><strong>${this._escapeHtml(goal.title)}</strong><span>${period} · ${record.periodKey} · ${record.currentCount}/${record.targetCount || 1}</span></div>
+                    <div class="goal-history-result ${record.completed ? 'done' : ''}">${record.completed ? '✓ Completed' : 'Missed'}${!record.completed ? `<button class="btn btn-secondary btn-sm" onclick="window.appUI.markHistoricalGoalComplete('${period}','${goal.id}',${index})">Mark retroactively</button>` : ''}</div>
+                </div>`).join('')}
         </div>
         `;
     },
@@ -1572,6 +1741,13 @@ export const UIController = {
     deleteGoalV2(period, id) {
         MilestoneGoalsV2.deleteGoal(period, id);
         this.showToast('Goal removed.', 'info');
+        this.renderGoalsV2Tab();
+    },
+
+    markHistoricalGoalComplete(period, goalId, historyIndex) {
+        const record = MilestoneGoalsV2.markHistoricalComplete(period, goalId, historyIndex);
+        if (!record) return;
+        this.showToast('Historical goal marked complete. Current progress was not changed.', 'success');
         this.renderGoalsV2Tab();
     },
 
@@ -1635,9 +1811,9 @@ export const UIController = {
                 </div>
             </div>
 
-            <!-- Row 2: Task Completion Rings -->
+            <!-- Row 2: Goal Completion Rings -->
             <div class="glass-panel" style="margin-bottom:20px;">
-                <div class="dashboard-widget-title"><span>🎯 Task Completion Rates</span></div>
+                <div class="dashboard-widget-title"><span>🎯 Goal Progress Toward Targets</span><span style="font-size:12px;color:var(--text-muted);">Milestones synced live</span></div>
                 <div id="chart-task-rings" style="padding:10px 0;"></div>
             </div>
 
@@ -1668,30 +1844,80 @@ export const UIController = {
     },
 
     // Actions
-    logAttendance(subjectId, status) {
+    logAttendance(subjectId, status, type = 'theory') {
+        const success = this._logAttendance(subjectId, status, type);
+        if (success) {
+            console.debug('[Attendance] Updated', { subjectId, status, type });
+            this.renderAll();
+            console.debug('[Attendance] Rendered all views after update');
+        }
+        return success;
+    },
+
+    _logAttendance(subjectId, status, type = 'theory', options = {}) {
         const subjects = Storage.getSubjects();
         const subject = subjects.find(s => s.id === subjectId);
         if (!subject) return;
+        type = AttendanceCalc.getSubjectType(subject);
 
-        const date = new Date().toISOString().split('T')[0];
+        const date = options.date || new Date().toISOString().split('T')[0];
         if (!subject.logs) subject.logs = [];
+        if (subject.theoryAttended === undefined) {
+            subject.theoryAttended = subject.attended || 0;
+            subject.theoryTotal = subject.total || 0;
+        }
+        const attendedKey = type === 'lab' ? 'labAttended' : 'theoryAttended';
+        const totalKey = type === 'lab' ? 'labTotal' : 'theoryTotal';
+        subject[attendedKey] = subject[attendedKey] || 0;
+        subject[totalKey] = subject[totalKey] || 0;
 
         if (status === 'present') {
-            subject.attended = (subject.attended || 0) + 1;
-            subject.total = (subject.total || 0) + 1;
+            subject[attendedKey] += 1;
+            subject[totalKey] += 1;
             XPSystem.earn('attendance_present');
         } else if (status === 'absent') {
-            subject.total = (subject.total || 0) + 1;
+            subject[totalKey] += 1;
             XPSystem.earn('attendance_absent');
         } else if (status === 'cancel') {
             // cancelled class — no attendance change, no XP
         }
 
-        subject.logs.push({ id: 'log-' + Date.now(), date, status });
+        subject.logs.push({ id: 'log-' + Date.now(), date, status, type, slotId: options.slotId || null, source: options.source || 'manual' });
         Storage.saveSubjects(subjects);
 
-        const xpMsg = status === 'present' ? ' (+5 XP)' : status === 'absent' ? ' (+1 XP)' : '';
-        this.showToast(`Logged ${status.toUpperCase()} for ${subject.name}${xpMsg}`, 'success');
+        return true;
+    },
+
+    markScheduleDayAttended(day = TimetableManager.getCurrentDayName()) {
+        const timetable = Storage.getTimetable();
+        const subjects = Storage.getSubjects();
+        const date = new Date().toISOString().split('T')[0];
+        const slots = (timetable[day] || []).filter(slot => subjects.some(subject => subject.id === slot.subjectId));
+        let loggedCount = 0;
+
+        slots.forEach(slot => {
+            const subject = subjects.find(item => item.id === slot.subjectId);
+            const alreadyLogged = (subject.logs || []).some(log =>
+                log.source === 'schedule' && log.slotId === slot.id && log.date === date
+            );
+            if (alreadyLogged) return;
+
+            if (this._logAttendance(subject.id, 'present', AttendanceCalc.getSubjectType(subject), {
+                date,
+                slotId: slot.id,
+                source: 'schedule'
+            })) {
+                loggedCount += 1;
+                XPSystem.earn('attendance_present');
+            }
+        });
+
+        if (loggedCount === 0) {
+            this.showToast(slots.length ? 'Today\'s schedule is already marked attended.' : 'No lectures found in today\'s schedule.', 'info');
+        } else {
+            Storage.saveSubjects(subjects);
+            this.showToast(`Marked ${loggedCount} lecture${loggedCount > 1 ? 's' : ''} attended for today.`, 'success');
+        }
         this.renderAll();
     },
 
@@ -1708,11 +1934,14 @@ export const UIController = {
         }
 
         const lastLog = subject.logs.pop();
+        const type = lastLog.type || 'theory';
+        const attendedKey = type === 'lab' ? 'labAttended' : 'theoryAttended';
+        const totalKey = type === 'lab' ? 'labTotal' : 'theoryTotal';
         if (lastLog.status === 'present') {
-            subject.attended = Math.max(0, subject.attended - 1);
-            subject.total = Math.max(0, subject.total - 1);
+            subject[attendedKey] = Math.max(0, (subject[attendedKey] || 0) - 1);
+            subject[totalKey] = Math.max(0, (subject[totalKey] || 0) - 1);
         } else if (lastLog.status === 'absent') {
-            subject.total = Math.max(0, subject.total - 1);
+            subject[totalKey] = Math.max(0, (subject[totalKey] || 0) - 1);
         }
 
         Storage.saveSubjects(subjects);
@@ -1741,6 +1970,10 @@ export const UIController = {
             targetPercentage: target,
             attended: 0,
             total: 0,
+            labAttended: 0,
+            labTotal: 0,
+            theoryAttended: 0,
+            theoryTotal: 0,
             color: randomColor,
             logs: []
         };
