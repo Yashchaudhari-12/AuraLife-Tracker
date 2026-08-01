@@ -330,7 +330,10 @@ export const UIController = {
 
         // ── Subject overview ─────────────────────────────────────────────
         const subjectBars = subjects.slice(0, 4).map(s => {
-            const stats = AttendanceCalc.calculateStats(s.attended, s.total, s.targetPercentage);
+            const attendance = AttendanceCalc.calculateSubjectAttendance(s);
+            const subjectAttended = attendance.type === 'lab' ? attendance.labAttended : attendance.theoryAttended;
+            const subjectTotal = attendance.type === 'lab' ? attendance.labTotal : attendance.theoryTotal;
+            const stats = AttendanceCalc.calculateStats(subjectAttended, subjectTotal, s.targetPercentage);
             return `<div style="margin-bottom:10px;">
                 <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px;">
                     <span>${s.name}</span><span style="color:${stats.statusColor}">${stats.percentage}%</span>
