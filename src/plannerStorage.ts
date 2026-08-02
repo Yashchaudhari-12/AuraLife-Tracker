@@ -5,6 +5,8 @@ export type TimeBlock = {
   category: string;
   completed: boolean;
   createdAt: string;
+  startTime?: string;
+  endTime?: string;
 };
 
 export type RoutineItem = {

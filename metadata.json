@@ -1,0 +1,6 @@
+{
+  "name": "AuraLife Tracker",
+  "description": "Personalized College Attendance Intelligence, Bunk Calculators, Life & Skill Goals Tracker, and Productivity OS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
