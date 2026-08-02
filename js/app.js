@@ -6,10 +6,22 @@
 import { UIController } from './ui.js?v=2026080101';
 import { Storage } from './storage.js?v=2026080101';
 import { DataMigration } from './migration.js?v=2026080101';
+import { AttendanceCalc } from './attendance.js';
+import { TimetableManager } from './timetable.js';
+import { CodingDashboard } from './coding_dashboard.js';
+import { HabitManager } from './habits.js';
+import { MilestoneGoalsV2 } from './goals_v2.js';
+import { TodaysFocus } from './todays_focus.js';
 
 DataMigration.runIfNeeded();
 window.appUI = UIController;
 window.appStorage = Storage;
+window.appAttendanceCalc = AttendanceCalc;
+window.appTimetableManager = TimetableManager;
+window.appCodingDashboard = CodingDashboard;
+window.appHabitManager = HabitManager;
+window.appMilestoneGoalsV2 = MilestoneGoalsV2;
+window.appTodaysFocus = TodaysFocus;
 
 function loadStylesheet(href) {
     if (document.querySelector(`link[href="${href}"]`)) return;

@@ -17,6 +17,7 @@ import { AnalyticsV2 } from './analytics_v2.js';
 import { TodaysFocus } from './todays_focus.js';
 import { MilestoneGoalsV2 } from './goals_v2.js';
 import { CodingDashboard } from './coding_dashboard.js';
+import { TimePlanner } from './time_planner.js';
 
 const QUOTES = [
     { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
@@ -146,6 +147,8 @@ export const UIController = {
             this.renderAttendanceTab(subjects);
         } else if (this.currentTab === 'timetable') {
             this.renderTimetableTab(timetable, subjects);
+        } else if (this.currentTab === 'timeplanner') {
+            this.renderTimePlannerTab();
         } else if (this.currentTab === 'calendar') {
             this.renderCalendarTab();
         } else if (this.currentTab === 'analytics') {
@@ -1868,6 +1871,67 @@ export const UIController = {
         AnalyticsEngine.renderSubjectBarChart('analytics-bar-chart', subjects);
     },
 
+    renderTimePlannerTab() {
+        // React Time Planner is mounted through the Vite bundle and manages its own UI.
+        // Keep the existing root element untouched so the React app can hydrate normally.
+    },
+
+    handleAddFocusBlock(e) {
+        e.preventDefault();
+        const titleInput = document.getElementById('field-planner-title');
+        const durationInput = document.getElementById('field-planner-duration');
+        const categoryInput = document.getElementById('field-planner-category');
+
+        const title = titleInput?.value.trim();
+        const duration = Number(durationInput?.value || 25);
+        const category = categoryInput?.value.trim() || 'Focus';
+
+        if (!title) {
+            this.showToast('Please enter a focus block title.', 'error');
+            return;
+        }
+        if (!duration || duration <= 0) {
+            this.showToast('Enter a valid duration in minutes.', 'error');
+            return;
+        }
+
+        TimePlanner.addFocusBlock({ title, durationMins: duration, category });
+        if (titleInput) titleInput.value = '';
+        if (durationInput) durationInput.value = '25';
+        if (categoryInput) categoryInput.value = '';
+
+        this.showToast('Focus block added successfully!', 'success');
+        this.renderTimePlannerTab();
+    },
+
+    toggleFocusBlockStatus(blockId) {
+        TimePlanner.toggleFocusBlockStatus(blockId);
+        this.renderTimePlannerTab();
+    },
+
+    deleteFocusBlock(blockId) {
+        TimePlanner.deleteFocusBlock(blockId);
+        this.showToast('Focus block removed.', 'info');
+        this.renderTimePlannerTab();
+    },
+
+    toggleRoutine(routineId) {
+        TimePlanner.completeRoutine(routineId);
+        this.renderTimePlannerTab();
+    },
+
+    markWeeklyReviewDone() {
+        const review = TimePlanner.markWeeklyReviewDone();
+        this.showToast(review.completed ? 'Weekly review completed. Great job!' : 'Weekly review reset.', 'success');
+        this.renderTimePlannerTab();
+    },
+
+    resetDailyRoutines() {
+        TimePlanner.resetDailyRoutines();
+        this.showToast('Daily routines reset to pending.', 'info');
+        this.renderTimePlannerTab();
+    },
+
     renderCalendarTab() {
         const habits = HabitManager.getData();
         CalendarRenderer.render('calendar-root', habits);
@@ -1875,7 +1939,11 @@ export const UIController = {
 
     // Actions
     logAttendance(subjectId, status, type = 'theory') {
-        this._logAttendance(subjectId, status, type);
+        const success = this._logAttendance(subjectId, status, type);
+        if (success) {
+            this.renderAll();
+        }
+        return success;
     },
 
     _logAttendance(subjectId, status, type = 'theory', options = {}) {

@@ -39,8 +39,9 @@ export const AttendanceCalc = {
                 statusColor = '#10b981';
             }
         } else {
-            // Formula for recovery: (A + R) / (T + R) >= P => R >= (P*T - A) / (1 - P)
-            const needed = Math.ceil((targetDecimal * total - attended) / (1 - targetDecimal));
+            // Formula for recovery: (A + R) / (T + R) >= P
+            // Use integer arithmetic to avoid floating-point rounding errors.
+            const needed = Math.ceil((targetPercentage * total - 100 * attended) / (100 - targetPercentage));
             requiredClasses = Math.max(0, needed);
 
             if (percentage < targetPercentage - 5) {
@@ -52,7 +53,7 @@ export const AttendanceCalc = {
             }
 
             message = requiredClasses > 0
-                ? `⚠️ Attend the next ${requiredClasses} class${requiredClasses > 1 ? 'es' : ''} in a row to reach ${targetPercentage}%.`
+                ? `⚠️ Attend ${requiredClasses} more class${requiredClasses > 1 ? 'es' : ''} to reach ${targetPercentage}%.`
                 : `⚠️ You need to attend the next class to reach ${targetPercentage}%.`;
         }
 

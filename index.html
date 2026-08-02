@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="css/tasks.css">
     <link rel="stylesheet" href="css/habits.css">
     <link rel="stylesheet" href="css/week.css">
+    <link rel="stylesheet" href="css/timeplanner.css">
     <link rel="stylesheet" href="css/calendar.css">
     <link rel="stylesheet" href="css/redesign.css">
 </head>
@@ -90,6 +91,9 @@
             <button class="nav-btn" data-tab="week">
                 🗓️ Weekly Rituals
             </button>
+            <button class="nav-btn" data-tab="timeplanner">
+                ⏱️ Time Planner
+            </button>
             <button class="nav-btn" data-tab="goals-v2">
                 🎯 Milestone Goals
             </button>
@@ -129,7 +133,12 @@
             <div id="week-tab-root"></div>
         </main>
 
-        <!-- TAB 5: MILESTONE GOALS -->
+        <!-- TAB 5: TIME PLANNER -->
+        <main id="tab-timeplanner" class="tab-content" style="display: none;">
+            <div id="timeplanner-root"></div>
+        </main>
+
+        <!-- TAB 6: MILESTONE GOALS -->
         <main id="tab-goals-v2" class="tab-content" style="display: none;">
             <div id="goals-v2-root"></div>
         </main>
@@ -524,6 +533,10 @@
             </form>
         </div>
     </div>
+
+    <!-- Time Planner React Bundle -->
+    <link rel="stylesheet" href="dist-timeplanner/assets/main.css">
+    <script type="module" src="dist-timeplanner/assets/main.js"></script>
 
     <!-- Application Script -->
     <script type="module" src="js/app.js?v=2026080101"></script>
