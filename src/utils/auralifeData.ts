@@ -8,7 +8,58 @@ import {
   FreeWindow,
   AiRecommendation,
   HeatmapDay,
+  DayMode,
 } from '../types/auralife';
+import { getStoredSchedulingPreferences } from './schedulingIntelligence';
+
+export function getStoredDayMode(): DayMode {
+  try {
+    const val = localStorage.getItem('auralife_day_mode');
+    if (
+      val &&
+      ['College Day', 'Library Day', 'Home Study Day', 'Holiday', 'Sick Leave', 'Exam Day'].includes(val)
+    ) {
+      return val as DayMode;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return 'College Day';
+}
+
+export function saveStoredDayMode(mode: DayMode) {
+  try {
+    localStorage.setItem('auralife_day_mode', mode);
+    window.dispatchEvent(new CustomEvent('auralife_daymode_updated', { detail: mode }));
+    window.dispatchEvent(new CustomEvent('auralife_schedule_updated'));
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+export type DailyPriority = 'DSA' | 'LeetCode' | 'AuraLife Development' | 'College Revision' | 'Mixed';
+
+export function getStoredDailyPriority(): DailyPriority {
+  try {
+    const val = localStorage.getItem('auralife_daily_priority');
+    if (val && ['DSA', 'LeetCode', 'AuraLife Development', 'College Revision', 'Mixed'].includes(val)) {
+      return val as DailyPriority;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return 'DSA';
+}
+
+export function saveStoredDailyPriority(priority: DailyPriority) {
+  try {
+    localStorage.setItem('auralife_daily_priority', priority);
+    window.dispatchEvent(new CustomEvent('auralife_priority_updated', { detail: priority }));
+    window.dispatchEvent(new CustomEvent('auralife_schedule_updated'));
+  } catch (e) {
+    console.error(e);
+  }
+}
 
 export const STORAGE_KEYS = {
   SUBJECTS: 'auralife_subjects',
@@ -151,7 +202,17 @@ export function getTodayDayName(): string {
   return days[new Date().getDay()];
 }
 
-export function getScheduleSlotsForDay(dayName: string): Array<TimetableSlot & { subject: Subject }> {
+export function getScheduleSlotsForDay(
+  dayName: string,
+  modeOverride?: DayMode
+): Array<TimetableSlot & { subject: Subject }> {
+  const mode = modeOverride || getStoredDayMode();
+
+  // Non-college day modes ignore college timetable
+  if (mode === 'Home Study Day' || mode === 'Holiday' || mode === 'Sick Leave' || mode === 'Exam Day') {
+    return [];
+  }
+
   const timetable = getStoredTimetable();
   const subjects = getStoredSubjects();
   let slots = timetable[dayName] || DEFAULT_TIMETABLE[dayName] || [];
@@ -525,202 +586,658 @@ export function getDsaAndLeetCodeProgress() {
 
 export function detectFreeWindows(
   slots: Array<TimetableSlot & { subject: Subject }>,
-  dayName?: string
+  dayName?: string,
+  modeOverride?: DayMode
 ): FreeWindow[] {
   const currentDay = dayName || getTodayDayName();
-  const sortedSlots = [...slots].sort(
-    (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
-  );
+  const dayMode = modeOverride || getStoredDayMode();
 
-  const progress = getDsaAndLeetCodeProgress();
+  const schedPrefs = getStoredSchedulingPreferences();
+  const priority = getStoredDailyPriority();
+  const wakeupMins = timeToMinutes(schedPrefs.preferredWakeupTime || '07:15');
+  const bedtimeMins = timeToMinutes(schedPrefs.preferredBedtime || '23:30');
+  const lunchStart = timeToMinutes(schedPrefs.lunchStartTime || '12:30');
+  const lunchEnd = timeToMinutes(schedPrefs.lunchEndTime || '13:30');
+  const dinnerStart = timeToMinutes(schedPrefs.dinnerStartTime || '20:00');
+  const dinnerEnd = timeToMinutes(schedPrefs.dinnerEndTime || '21:00');
+  const commuteMins = schedPrefs.commuteTimeMins || 30;
+  const targetDuration = schedPrefs.preferredDeepWorkDuration || 90;
+  const maxAllowed = schedPrefs.maxFocusBlocksPerDay || 3;
 
-  // Helper to check if [start, end] overlaps with any scheduled class slot
-  const overlapsWithClass = (start: number, end: number) => {
-    return sortedSlots.some((slot) => {
-      const sStart = timeToMinutes(slot.startTime);
-      const sEnd = timeToMinutes(slot.endTime);
-      return Math.max(start, sStart) < Math.min(end, sEnd);
-    });
-  };
-
-  // NO COLLEGE / OFF-DAY: Generate 4x 90-minute focus blocks
-  if (sortedSlots.length === 0) {
+  // 1. SICK LEAVE MODE
+  if (dayMode === 'Sick Leave') {
     return [
       {
-        startTime: '08:30',
-        endTime: '10:00',
-        durationMinutes: 90,
-        suggestedTopic: `Focus Block 1`,
-        suggestedGoal: `90-minute uninterrupted Focus Block (${currentDay} Off-Day)`,
-        estimatedCompletionMinutes: 90,
+        startTime: '16:00',
+        endTime: '16:30',
+        durationMinutes: 30,
+        suggestedTopic: 'Light Reading & Health Recovery',
+        suggestedGoal: 'Optional 30-min concept refresh (No heavy problem solving during Sick Leave)',
+        estimatedCompletionMinutes: 30,
         confidence: 'High',
-        windowType: 'offday',
-        dsaRepoSync: progress.githubRepoInfo,
-        leetcodeSync: progress.leetcodeInfo,
-      },
-      {
-        startTime: '10:30',
-        endTime: '12:00',
-        durationMinutes: 90,
-        suggestedTopic: `Focus Block 2`,
-        suggestedGoal: `90-minute uninterrupted Focus Block (${currentDay} Off-Day)`,
-        estimatedCompletionMinutes: 90,
-        confidence: 'High',
-        windowType: 'offday',
-        dsaRepoSync: progress.githubRepoInfo,
-        leetcodeSync: progress.leetcodeInfo,
-      },
-      {
-        startTime: '14:00',
-        endTime: '15:30',
-        durationMinutes: 90,
-        suggestedTopic: `Focus Block 3`,
-        suggestedGoal: `90-minute uninterrupted Focus Block (${currentDay} Off-Day)`,
-        estimatedCompletionMinutes: 90,
-        confidence: 'High',
-        windowType: 'offday',
-        dsaRepoSync: progress.githubRepoInfo,
-        leetcodeSync: progress.leetcodeInfo,
-      },
-      {
-        startTime: '16:30',
-        endTime: '18:00',
-        durationMinutes: 90,
-        suggestedTopic: `Focus Block 4`,
-        suggestedGoal: `90-minute uninterrupted Focus Block (${currentDay} Off-Day)`,
-        estimatedCompletionMinutes: 90,
-        confidence: 'High',
-        windowType: 'offday',
-        dsaRepoSync: progress.githubRepoInfo,
-        leetcodeSync: progress.leetcodeInfo,
+        windowType: 'midday',
+        reasons: [
+          'Sick Leave Active: Heavy coding sessions paused for health recovery',
+          'Optional 30-minute light concept review',
+          'Prioritizes rest, fluids, and sleep schedule',
+        ],
       },
     ];
   }
 
-  // COLLEGE DAY: Dynamically calculate 3 non-overlapping Focus Blocks
-  // Buffers: 45m Get Ready routine after waking up, 30m Commute to college, 30m Commute home, 45m post-college refresh.
-  const freeWindows: FreeWindow[] = [];
-  let blockCounter = 1;
+  // 2. EXAM DAY MODE
+  if (dayMode === 'Exam Day') {
+    const start1 = wakeupMins + 60;
+    const end1 = start1 + targetDuration;
+    const start2 = 14 * 60 + 30; // 14:30
+    const end2 = start2 + targetDuration;
 
-  const getReadyMins = Number(localStorage.getItem(STORAGE_KEYS.GET_READY_TIME) || 45); // 45m Get Ready
-  const travelMins = Number(localStorage.getItem(STORAGE_KEYS.TRAVEL_TIME) || 30); // 30m Commute
-  const sleepTargetHours = Number(localStorage.getItem(STORAGE_KEYS.SLEEP_TARGET) || 7.0); // 7.0h Min Sleep
-
-  const firstClassStartMins = timeToMinutes(sortedSlots[0].startTime);
-  const firstCode = sortedSlots[0].subject?.code || 'Lecture';
-
-  // 1. Morning Focus Block (Wake Up at 06:00 AM -> 45m Shower/Brush Routine 06:00-06:45 -> Focus Block 06:45-08:15 -> Commute 08:15)
-  const MORNING_START_MINS = 6 * 60 + 45; // 06:45 AM
-  const MORNING_END_MINS = 8 * 60 + 15;   // 08:15 AM
-
-  if (!overlapsWithClass(MORNING_START_MINS, MORNING_END_MINS)) {
-    const morningStartStr = minsTo24h(MORNING_START_MINS);
-    const morningEndStr = minsTo24h(MORNING_END_MINS);
-    const getReadyStr = `06:00–06:45 AM`;
-    const travelStr = `08:15–${minsTo24h(firstClassStartMins)}`;
-
-    freeWindows.push({
-      startTime: morningStartStr,
-      endTime: morningEndStr,
-      durationMinutes: 90,
-      suggestedTopic: `Morning Focus Block`,
-      suggestedGoal: `Morning Deep Work [06:00 AM Wakeup -> 45m Routine (${getReadyStr}) -> Focus Block -> Commute (${travelStr}) before ${firstCode}]`,
-      estimatedCompletionMinutes: 90,
-      confidence: 'High',
-      nextSlotName: firstCode,
-      windowType: 'morning',
-      dsaRepoSync: progress.githubRepoInfo,
-      leetcodeSync: progress.leetcodeInfo,
-    });
+    return [
+      {
+        startTime: minsTo24h(start1),
+        endTime: minsTo24h(end1),
+        durationMinutes: targetDuration,
+        suggestedTopic: 'Exam Revision Block 1: Formulae & Core Concepts',
+        suggestedGoal: 'High-weightage concept review & past year exam questions',
+        estimatedCompletionMinutes: targetDuration,
+        confidence: 'High',
+        windowType: 'morning',
+        reasons: [
+          'Exam Day Mode: Exclusive focus on high-weightage subject syllabus',
+          'Hides non-essential coding tasks to prevent cognitive overload',
+          'Aligned with sleep and meal buffers for peak exam focus',
+        ],
+      },
+      {
+        startTime: minsTo24h(start2),
+        endTime: minsTo24h(end2),
+        durationMinutes: targetDuration,
+        suggestedTopic: 'Exam Revision Block 2: Mock Test & Numerical Practice',
+        suggestedGoal: 'Timed solving & high-probability question review',
+        estimatedCompletionMinutes: targetDuration,
+        confidence: 'High',
+        windowType: 'midday',
+        reasons: [
+          'Midday exam practice sprint before final evening review',
+          'Zero conflict with lunch break (12:30–13:30)',
+          'Maximizes memory retention for upcoming exam',
+        ],
+      },
+    ].slice(0, maxAllowed);
   }
 
-  // 2. Midday Gaps Between Classes (Only if there is a gap >= 60m after accounting for lunch/snacks break)
-  for (let i = 0; i < sortedSlots.length - 1; i++) {
-    const classEndMins = timeToMinutes(sortedSlots[i].endTime);
-    const nextClassStartMins = timeToMinutes(sortedSlots[i + 1].startTime);
-    const gapMins = nextClassStartMins - classEndMins;
+  // 3. HOME STUDY DAY MODE
+  if (dayMode === 'Home Study Day') {
+    const morningStart = wakeupMins + 45; // e.g. 08:00
+    const morningEnd = morningStart + targetDuration; // 09:30
+    const block2Start = morningEnd + 30; // 10:00
+    const block2End = block2Start + targetDuration; // 11:30
+    const afternoonStart = 14 * 60; // 14:00
+    const afternoonEnd = afternoonStart + targetDuration; // 15:30
+    const eveningStart = 17 * 60 + 30; // 17:30
+    const eveningEnd = eveningStart + targetDuration; // 19:00
 
-    // Deduct 30m for lunch/snacks if gap spans meal times
-    const isLunchTime = classEndMins >= 11 * 60 + 30 && nextClassStartMins <= 15 * 60;
-    const lunchBufferMins = isLunchTime ? 30 : 15;
-    const usableGapMins = gapMins - lunchBufferMins;
+    return [
+      {
+        startTime: minsTo24h(morningStart),
+        endTime: minsTo24h(morningEnd),
+        durationMinutes: targetDuration,
+        suggestedTopic: 'Home Study Block 1: Morning Deep Work',
+        suggestedGoal: `${targetDuration}-min uninterrupted DSA & problem solving sprint at home`,
+        estimatedCompletionMinutes: targetDuration,
+        confidence: 'High',
+        windowType: 'morning',
+        reasons: [
+          'Home Study Day: Dedicated deep work session without campus commute',
+          `Aligned with wake-up (${schedPrefs.preferredWakeupTime}) and morning routine`,
+          'Zero lecture interruptions today',
+          "Completes today's DSA & LeetCode goal",
+        ],
+      },
+      {
+        startTime: minsTo24h(block2Start),
+        endTime: minsTo24h(block2End),
+        durationMinutes: targetDuration,
+        suggestedTopic: 'Home Study Block 2: Algorithm & Data Structure Deep Dive',
+        suggestedGoal: 'Advanced problem patterns & complex testcase analysis',
+        estimatedCompletionMinutes: targetDuration,
+        confidence: 'High',
+        windowType: 'morning',
+        reasons: [
+          'Pre-lunch focus block for uninterrupted problem solving',
+          'Quiet environment for high-cognitive work',
+          'Fits your target 90-min deep work duration',
+        ],
+      },
+      {
+        startTime: minsTo24h(afternoonStart),
+        endTime: minsTo24h(afternoonEnd),
+        durationMinutes: targetDuration,
+        suggestedTopic: 'Home Study Block 3: System Architecture Sprint',
+        suggestedGoal: 'Full-stack module development & system design',
+        estimatedCompletionMinutes: targetDuration,
+        confidence: 'High',
+        windowType: 'midday',
+        reasons: [
+          'Midday home study block after lunch break (12:30–13:30)',
+          'Quiet environment for complex coding tasks',
+          'Fits your target deep work duration',
+        ],
+      },
+      {
+        startTime: minsTo24h(eveningStart),
+        endTime: minsTo24h(eveningEnd),
+        durationMinutes: targetDuration,
+        suggestedTopic: 'Home Study Block 4: Evening Revision & LeetCode',
+        suggestedGoal: 'Daily LeetCode Challenge & key subject consolidation',
+        estimatedCompletionMinutes: targetDuration,
+        confidence: 'High',
+        windowType: 'evening',
+        reasons: [
+          'Evening revision session before dinner (20:00)',
+          `Safeguards your ${schedPrefs.preferredBedtime || '23:30'} bedtime`,
+          "Reinforces today's learning outcomes",
+        ],
+      },
+    ];
+  }
 
-    if (usableGapMins >= 60) {
-      const gapStartMins = classEndMins + lunchBufferMins;
-      const gapEndMins = gapStartMins + Math.min(90, usableGapMins);
+  // 4. HOLIDAY MODE
+  if (dayMode === 'Holiday') {
+    const block1Start = wakeupMins + 60; // 08:15
+    const block1End = block1Start + targetDuration; // 09:45
+    const block2Start = block1End + 30; // 10:15
+    const block2End = block2Start + targetDuration; // 11:45
+    const block3Start = 14 * 60 + 30; // 14:30
+    const block3End = block3Start + targetDuration; // 16:00
+    const block4Start = 17 * 60 + 30; // 17:30
+    const block4End = block4Start + targetDuration; // 19:00
 
-      if (!overlapsWithClass(gapStartMins, gapEndMins)) {
-        freeWindows.push({
-          startTime: minsTo24h(gapStartMins),
-          endTime: minsTo24h(gapEndMins),
-          durationMinutes: gapEndMins - gapStartMins,
-          suggestedTopic: `Focus Block ${blockCounter++}`,
-          suggestedGoal: `Midday Focus Block. [Includes ${lunchBufferMins}m Lunch/Snacks Buffer between classes]`,
-          estimatedCompletionMinutes: gapEndMins - gapStartMins,
+    return [
+      {
+        startTime: minsTo24h(block1Start),
+        endTime: minsTo24h(block1End),
+        durationMinutes: targetDuration,
+        suggestedTopic: 'Holiday Focus Block 1: Algorithm Mastery',
+        suggestedGoal: 'Uninterrupted holiday deep work on A2Z Sheet problems',
+        estimatedCompletionMinutes: targetDuration,
+        confidence: 'High',
+        windowType: 'offday',
+        reasons: [
+          'Holiday Schedule: Full-day self-paced learning & skill growth',
+          'Zero campus commute or class deadlines today',
+          'Includes scheduled relaxation and meal breaks',
+        ],
+      },
+      {
+        startTime: minsTo24h(block2Start),
+        endTime: minsTo24h(block2End),
+        durationMinutes: targetDuration,
+        suggestedTopic: 'Holiday Focus Block 2: LeetCode & Code Review',
+        suggestedGoal: 'Solve 2 Mediums & optimize space/time complexity',
+        estimatedCompletionMinutes: targetDuration,
+        confidence: 'High',
+        windowType: 'offday',
+        reasons: [
+          'Late morning focus sprint before lunch',
+          'High cognitive capacity window',
+          'Builds momentum for holiday learning',
+        ],
+      },
+      {
+        startTime: minsTo24h(block3Start),
+        endTime: minsTo24h(block3End),
+        durationMinutes: targetDuration,
+        suggestedTopic: 'Holiday Focus Block 3: Full-Stack Project Work',
+        suggestedGoal: 'Build & test major applet features',
+        estimatedCompletionMinutes: targetDuration,
+        confidence: 'High',
+        windowType: 'offday',
+        reasons: [
+          'Afternoon project development block',
+          'Fits preferred study duration',
+          'Balanced with evening leisure time',
+        ],
+      },
+      {
+        startTime: minsTo24h(block4Start),
+        endTime: minsTo24h(block4End),
+        durationMinutes: targetDuration,
+        suggestedTopic: 'Holiday Focus Block 4: System Architecture & Notes',
+        suggestedGoal: 'Document key concepts, design patterns & revision notes',
+        estimatedCompletionMinutes: targetDuration,
+        confidence: 'High',
+        windowType: 'offday',
+        reasons: [
+          'Pre-dinner evening consolidation session',
+          'Protects bedtime & sleep recovery',
+          'Completes 4 deep work sessions today',
+        ],
+      },
+    ];
+  }
+
+  // 5. LIBRARY DAY OR COLLEGE DAY
+  // For Library Day: theory classes skipped for library focus, labs preserved
+  // For College Day: theory + labs attended
+  const rawSlots = getStoredTimetable()[currentDay] || DEFAULT_TIMETABLE[currentDay] || [];
+
+  // SPECIAL ENHANCED COLLEGE DAY ENGINE
+  if (dayMode === 'College Day') {
+    const sortedSlots = [...rawSlots].sort(
+      (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+    );
+
+    const firstClassStart = sortedSlots.length > 0 ? timeToMinutes(sortedSlots[0].startTime) : 9 * 60;
+    const lastClassEnd = sortedSlots.length > 0 ? timeToMinutes(sortedSlots[sortedSlots.length - 1].endTime) : 16 * 60 + 30;
+    const reachHomeMins = Math.min(1440, lastClassEnd + commuteMins);
+
+    const collegeWindows: FreeWindow[] = [];
+
+    // Optional Morning Study (ONLY if explicitly enabled in preferences)
+    if (schedPrefs.morningDeepWorkEnabled) {
+      const morningStart = wakeupMins + 30;
+      const morningEnd = morningStart + 60;
+      const morningCommuteStart = firstClassStart - commuteMins;
+      if (morningEnd <= morningCommuteStart) {
+        collegeWindows.push({
+          startTime: minsTo24h(morningStart),
+          endTime: minsTo24h(morningEnd),
+          durationMinutes: 60,
+          suggestedTopic: 'Morning Prime: Fast Problem Solving',
+          suggestedGoal: 'Warm-up with 1 LeetCode Medium / Quick Revision before college',
+          estimatedCompletionMinutes: 60,
           confidence: 'High',
-          windowType: 'midday',
-          dsaRepoSync: progress.githubRepoInfo,
-          leetcodeSync: progress.leetcodeInfo,
+          windowType: 'morning',
+          reasons: [
+            'Morning Study is explicitly enabled in preferences',
+            'Completed before morning commute to college',
+            'Protects breakfast & routine window',
+          ],
         });
+      }
+    }
+
+    // Dynamic Block Content based on Today's Priority
+    let b1Topic = 'Block 1: A2Z Sheet Problems';
+    let b1Goal = 'Solve core topic problems on A2Z Sheet (Highest Priority)';
+    let b2Topic = 'Block 2: LeetCode Daily';
+    let b2Goal = 'Solve Daily LeetCode Challenge & review optimal complexity';
+    let b3Topic = 'Block 3: Pattern Revision';
+    let b3Goal = 'Revise algorithms, space/time complexities & weak patterns';
+
+    if (priority === 'AuraLife Development') {
+      b1Topic = 'Block 1: Feature Development';
+      b1Goal = 'Build core applet features & user interfaces';
+      b2Topic = 'Block 2: Bug Fixes & Architecture';
+      b2Goal = 'Fix console warnings, edge cases & modular architecture';
+      b3Topic = 'Block 3: Testing & Documentation';
+      b3Goal = 'Verify build compilation, types & component flows';
+    } else if (priority === 'College Revision') {
+      b1Topic = 'Block 1: Subject Revision';
+      b1Goal = 'Revise lecture notes & key subject concepts';
+      b2Topic = 'Block 2: Assignments & Lab Manuals';
+      b2Goal = 'Complete pending class assignments & lab reports';
+      b3Topic = 'Block 3: Practice & Past Papers';
+      b3Goal = 'Solve previous year questions & tutorial problems';
+    } else if (priority === 'LeetCode') {
+      b1Topic = 'Block 1: LeetCode Daily & Contest Review';
+      b1Goal = 'Solve Daily LeetCode Challenge & review contest problems';
+      b2Topic = 'Block 2: Medium/Hard Topic Practice';
+      b2Goal = 'Practice 2 Medium/Hard problems on target topic';
+      b3Topic = 'Block 3: Space & Time Complexity Review';
+      b3Goal = 'Review optimal space/time complexities & dry-run solutions';
+    } else if (priority === 'Mixed') {
+      b1Topic = 'Block 1: Core DSA Problem';
+      b1Goal = 'Solve primary DSA problem';
+      b2Topic = 'Block 2: Applet Feature Build';
+      b2Goal = 'Develop core applet features';
+      b3Topic = 'Block 3: College Subject Revision';
+      b3Goal = 'Review lecture notes & assignments';
+    }
+
+    // --- EVENING SCHEDULE ALLOCATION (AFTER COLLEGE & COMMUTE HOME) ---
+
+    // BLOCK 1: Immediately after reaching home (90 minutes)
+    const b1Start = reachHomeMins;
+    const b1Duration = 90;
+    const b1End = b1Start + b1Duration;
+
+    collegeWindows.push({
+      startTime: minsTo24h(b1Start),
+      endTime: minsTo24h(b1End),
+      durationMinutes: b1Duration,
+      suggestedTopic: b1Topic,
+      suggestedGoal: b1Goal,
+      estimatedCompletionMinutes: b1Duration,
+      confidence: 'High',
+      windowType: 'evening',
+      reasons: [
+        'Block 1: Immediately after reaching home (College completed first)',
+        `Dedicated to today's highest priority: ${priority}`,
+        '90 minutes of uninterrupted deep focus',
+      ],
+    });
+
+    // BREAK: 25 minutes
+    const breakDuration = 25;
+    let nextAvailable = b1End + breakDuration;
+
+    // BLOCK 2: 90 minutes (Respecting Dinner Time)
+    let b2Start = nextAvailable;
+    let b2Duration = 90;
+    let b2End = b2Start + b2Duration;
+
+    // Adjust Block 2 around dinner if needed
+    if (b2Start < dinnerStart && b2End > dinnerStart) {
+      if (dinnerStart - b2Start >= 60) {
+        b2Duration = dinnerStart - b2Start;
+        b2End = dinnerStart;
+        nextAvailable = dinnerEnd;
+      } else {
+        b2Start = dinnerEnd;
+        b2End = b2Start + b2Duration;
+        nextAvailable = b2End;
+      }
+    } else if (b2Start >= dinnerStart && b2Start < dinnerEnd) {
+      b2Start = dinnerEnd;
+      b2End = b2Start + b2Duration;
+      nextAvailable = b2End;
+    } else {
+      nextAvailable = Math.max(b2End, dinnerEnd);
+    }
+
+    // Ensure Block 2 fits before bedtime
+    if (b2End <= bedtimeMins) {
+      collegeWindows.push({
+        startTime: minsTo24h(b2Start),
+        endTime: minsTo24h(b2End),
+        durationMinutes: b2Duration,
+        suggestedTopic: b2Topic,
+        suggestedGoal: b2Goal,
+        estimatedCompletionMinutes: b2Duration,
+        confidence: 'High',
+        windowType: 'evening',
+        reasons: [
+          'Block 2: Evening deep work session after college',
+          'Protects dinner & evening decompression',
+          `${b2Duration} minutes focused on secondary priority`,
+        ],
+      });
+    } else {
+      const maxB2 = Math.max(60, bedtimeMins - b2Start - 15);
+      if (maxB2 >= 45) {
+        b2End = b2Start + maxB2;
+        collegeWindows.push({
+          startTime: minsTo24h(b2Start),
+          endTime: minsTo24h(b2End),
+          durationMinutes: maxB2,
+          suggestedTopic: b2Topic,
+          suggestedGoal: b2Goal,
+          estimatedCompletionMinutes: maxB2,
+          confidence: 'High',
+          windowType: 'evening',
+          reasons: [
+            'Block 2: Evening deep work session',
+            'Adjusted duration to strictly protect sleep target',
+          ],
+        });
+      }
+    }
+
+    // OPTIONAL BLOCK 3: 60-90 minutes (Light College Day)
+    const b3Start = nextAvailable + 15; // 15m break buffer
+    const availableForB3 = bedtimeMins - b3Start;
+
+    if (availableForB3 >= 60) {
+      const b3Duration = Math.min(90, Math.max(60, availableForB3));
+      const b3End = b3Start + b3Duration;
+
+      collegeWindows.push({
+        startTime: minsTo24h(b3Start),
+        endTime: minsTo24h(b3End),
+        durationMinutes: b3Duration,
+        suggestedTopic: b3Topic,
+        suggestedGoal: b3Goal,
+        estimatedCompletionMinutes: b3Duration,
+        confidence: 'High',
+        windowType: 'night',
+        reasons: [
+          'Optional Block 3: Light College Day opportunity',
+          'Generated because sufficient time exists before bedtime',
+          `Protects sleep target (${minsTo24h(bedtimeMins)})`,
+        ],
+      });
+    }
+
+    return collegeWindows;
+  }
+
+  // STANDARD GAP DETECTION FOR LIBRARY DAY / HOME STUDY DAY / HOLIDAYS
+  const activeSlots = dayMode === 'Library Day' ? rawSlots.filter((s) => s.type === 'lab') : rawSlots;
+
+  const sortedSlots = [...activeSlots].sort(
+    (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+  );
+
+  interface Interval {
+    start: number;
+    end: number;
+    label: string;
+  }
+
+  const occupied: Interval[] = [];
+
+  // Sleep constraints
+  occupied.push({ start: 0, end: wakeupMins, label: 'Sleep/Wakeup' });
+  occupied.push({ start: bedtimeMins, end: 1440, label: 'Bedtime/Sleep' });
+
+  // Meal times
+  if (lunchEnd > lunchStart) {
+    occupied.push({ start: lunchStart, end: lunchEnd, label: 'Lunch Break' });
+  }
+  if (dinnerEnd > dinnerStart) {
+    occupied.push({ start: dinnerStart, end: dinnerEnd, label: 'Dinner Break' });
+  }
+
+  // College Timetable & Commutes
+  if (rawSlots.length > 0) {
+    const firstClassStart = timeToMinutes(rawSlots[0].startTime);
+    const lastClassEnd = timeToMinutes(rawSlots[rawSlots.length - 1].endTime);
+
+    // Morning commute to college
+    const morningCommuteStart = Math.max(0, firstClassStart - commuteMins);
+    occupied.push({ start: morningCommuteStart, end: firstClassStart, label: 'Commute to College' });
+
+    // Evening commute home
+    const eveningCommuteEnd = Math.min(1440, lastClassEnd + commuteMins);
+    occupied.push({ start: lastClassEnd, end: eveningCommuteEnd, label: 'Commute Home' });
+
+    // Active classes (In Library Day, only Labs are occupied)
+    for (const slot of sortedSlots) {
+      const sStart = timeToMinutes(slot.startTime);
+      const sEnd = timeToMinutes(slot.endTime);
+      if (sEnd > sStart) {
+        occupied.push({
+          start: sStart,
+          end: sEnd,
+          label: slot.room ? `Lab (${slot.room})` : 'Class',
+        });
+      }
+    }
+
+    if (!schedPrefs.morningDeepWorkEnabled) {
+      occupied.push({ start: 0, end: firstClassStart, label: 'No Morning Study' });
+    }
+  }
+
+  // Sort & Merge Occupied Intervals
+  occupied.sort((a, b) => a.start - b.start);
+
+  const merged: { start: number; end: number }[] = [];
+  for (const interval of occupied) {
+    if (interval.end <= interval.start) continue;
+    if (merged.length === 0) {
+      merged.push({ start: interval.start, end: interval.end });
+    } else {
+      const last = merged[merged.length - 1];
+      if (interval.start <= last.end) {
+        last.end = Math.max(last.end, interval.end);
+      } else {
+        merged.push({ start: interval.start, end: interval.end });
       }
     }
   }
 
-  // 3. Post-Class Evening & Night Focus Blocks
-  const lastClassEndMins = timeToMinutes(sortedSlots[sortedSlots.length - 1].endTime);
-  const lastCode = sortedSlots[sortedSlots.length - 1].subject?.code || 'Classes';
+  // Find Unoccupied Free Gaps
+  const freeWindows: FreeWindow[] = [];
 
-  // Buffers: 30m Travel Home + 45m Post-College Refresh / Evening Snacks & Lunch
-  const travelHomeEndMins = lastClassEndMins + travelMins;
-  const snacksEndMins = travelHomeEndMins + 45; // post-college refresh
-  const eveStartMins = snacksEndMins;
-  const eveEndMins = eveStartMins + 90;
+  for (let i = 0; i < merged.length - 1; i++) {
+    const gapStart = merged[i].end;
+    const gapEnd = merged[i + 1].start;
+    const gapDuration = gapEnd - gapStart;
 
-  const travelHomeStr = `${minsTo24h(lastClassEndMins)}–${minsTo24h(travelHomeEndMins)}`;
-  const snacksStr = `${minsTo24h(travelHomeEndMins)}–${minsTo24h(snacksEndMins)}`;
+    if (gapDuration < 45) {
+      continue;
+    }
 
-  if (!overlapsWithClass(eveStartMins, eveEndMins)) {
+    const blockDuration = Math.min(targetDuration, gapDuration);
+    const blockStart = gapStart;
+    const blockEnd = blockStart + blockDuration;
+
+    let windowType: 'morning' | 'midday' | 'evening' | 'offday' = 'midday';
+    if (blockStart < 12 * 60) {
+      windowType = rawSlots.length === 0 ? 'offday' : 'morning';
+    } else if (blockStart >= 17 * 60) {
+      windowType = 'evening';
+    } else if (rawSlots.length === 0) {
+      windowType = 'offday';
+    }
+
+    const startStr = minsTo24h(blockStart);
+    const endStr = minsTo24h(blockEnd);
+
+    const reasons = dayMode === 'Library Day'
+      ? [
+          'Library Day: Quiet focus window in campus library during theory lecture hours',
+          'Labs preserved and attended on campus',
+          '⚠️ Attendance impact: Bunking theory lectures lowers attendance by ~1.2%',
+          `Fits your preferred study duration (${targetDuration} minutes)`,
+        ]
+      : [
+          `${gapDuration}-minute uninterrupted window ${
+            windowType === 'evening'
+              ? 'after college'
+              : windowType === 'morning'
+              ? 'before college'
+              : rawSlots.length === 0
+              ? 'on off-day'
+              : 'between classes'
+          }`,
+          `Fits your preferred study duration (${targetDuration} minutes)`,
+          `No conflict with meals (${schedPrefs.lunchStartTime || '12:30'} lunch / ${
+            schedPrefs.dinnerStartTime || '20:00'
+          } dinner) or sleep`,
+          "Completes today's DSA & LeetCode target",
+        ];
+
     freeWindows.push({
-      startTime: minsTo24h(eveStartMins),
-      endTime: minsTo24h(eveEndMins),
-      durationMinutes: 90,
-      suggestedTopic: `Focus Block ${blockCounter++}`,
-      suggestedGoal: `Evening Focus Block. [Buffers: ${travelMins}m Commute Home (${travelHomeStr}) & 45m Refresh (${snacksStr}) after ${lastCode}]`,
-      estimatedCompletionMinutes: 90,
+      startTime: startStr,
+      endTime: endStr,
+      durationMinutes: blockDuration,
+      suggestedTopic:
+        dayMode === 'Library Day'
+          ? 'Library Focus: A2Z Sheet & Deep Coding'
+          : windowType === 'evening'
+          ? 'Evening Focus Sprint: DSA & LeetCode'
+          : windowType === 'morning'
+          ? 'Morning Deep Work: Algorithms'
+          : 'Free Window Study Block',
+      suggestedGoal: 'Solve 2 Medium DSA problems & update daily notes',
+      estimatedCompletionMinutes: blockDuration,
       confidence: 'High',
-      prevSlotName: lastCode,
-      windowType: 'evening',
-      dsaRepoSync: progress.githubRepoInfo,
-      leetcodeSync: progress.leetcodeInfo,
+      windowType,
+      reasons,
     });
   }
 
-  // 4. Second Evening/Night Focus Block (protected by 7.0h minimum sleep window)
-  if (freeWindows.length < 3) {
-    const nightStartMins = eveEndMins + 30; // 30m break
-    const nightEndMins = nightStartMins + 90;
-    // Ensure night focus block wraps up before 11:30 PM to guarantee 7.0+ hours sleep before morning wake-up
-    if (nightEndMins <= 23 * 60 + 30 && !overlapsWithClass(nightStartMins, nightEndMins)) {
-      freeWindows.push({
-        startTime: minsTo24h(nightStartMins),
-        endTime: minsTo24h(nightEndMins),
-        durationMinutes: 90,
-        suggestedTopic: `Focus Block ${blockCounter++}`,
-        suggestedGoal: `Night Focus Block (Wraps up early to safeguard ${sleepTargetHours}h minimum sleep schedule)`,
-        estimatedCompletionMinutes: 90,
-        confidence: 'High',
-        windowType: 'evening',
-        dsaRepoSync: progress.githubRepoInfo,
-        leetcodeSync: progress.leetcodeInfo,
-      });
-    }
-  }
-
-  return freeWindows;
+  return freeWindows.slice(0, maxAllowed);
 }
 
-export function generateAiRecommendation(dayName?: string): AiRecommendation {
+export function generateAiRecommendation(dayName?: string, modeOverride?: DayMode): AiRecommendation {
   const currentDay = dayName || getTodayDayName();
+  const dayMode = modeOverride || getStoredDayMode();
+
+  if (dayMode === 'Sick Leave') {
+    return {
+      contextSummary: 'Sick Leave Active: Prioritizing health recovery. All heavy problem-solving sessions paused.',
+      tasks: [
+        { text: 'Rest, hydrate & sleep', estimatedMinutes: 120, category: 'Health' },
+        { text: 'Optional 20-min light reading if feeling better', estimatedMinutes: 20, category: 'Revision' },
+      ],
+      totalEstimatedMinutes: 140,
+      priority: 'Normal',
+      reasoning: 'Health recovery takes top priority to resume peak focus tomorrow.',
+    };
+  }
+
+  if (dayMode === 'Exam Day') {
+    return {
+      contextSummary: 'Exam Day Active: Hides non-essential coding tasks and focuses 100% on high-weightage exam syllabus.',
+      tasks: [
+        { text: 'Revise Core Subject Formulae & High-Weightage Topics', estimatedMinutes: 60, category: 'Exam' },
+        { text: 'Solve Past 3 Years Exam Question Papers', estimatedMinutes: 60, category: 'Exam' },
+        { text: 'Final Formula Sheet & Key Diagrams Review', estimatedMinutes: 30, category: 'Exam' },
+      ],
+      totalEstimatedMinutes: 150,
+      priority: 'High',
+      reasoning: 'Exclusive exam revision maximizes test scores and academic standing.',
+    };
+  }
+
+  if (dayMode === 'Library Day') {
+    return {
+      contextSummary: 'Library Day Active: Theory lectures replaced with quiet campus library focus blocks. Labs attended.',
+      tasks: [
+        { text: 'Uninterrupted Library Study Block: A2Z Sheet DSA', estimatedMinutes: 90, category: 'Coding' },
+        { text: 'Attend Scheduled College Lab Session', estimatedMinutes: 60, category: 'College' },
+        { text: 'LeetCode Daily Challenge & Note Review', estimatedMinutes: 45, category: 'Coding' },
+      ],
+      totalEstimatedMinutes: 195,
+      priority: 'High',
+      reasoning: 'Library self-study combined with required lab attendance for optimal productivity.',
+    };
+  }
+
+  if (dayMode === 'Home Study Day') {
+    return {
+      contextSummary: 'Home Study Day Active: College timetable paused. Structured home learning plan.',
+      tasks: [
+        { text: 'Morning Focus Sprint: Solve 3 LeetCode Mediums', estimatedMinutes: 90, category: 'Coding' },
+        { text: 'Full-Stack Project Module Development', estimatedMinutes: 75, category: 'Project' },
+        { text: 'Subject Consolidation & Key Note Review', estimatedMinutes: 45, category: 'Revision' },
+      ],
+      totalEstimatedMinutes: 210,
+      priority: 'High',
+      reasoning: 'Home study day eliminates commute time for longer, continuous deep work blocks.',
+    };
+  }
+
+  if (dayMode === 'Holiday') {
+    return {
+      contextSummary: 'Holiday Active: Full-day deep work, project sprint, and relaxation plan.',
+      tasks: [
+        { text: 'Holiday Deep Work: A2Z Sheet Algorithms', estimatedMinutes: 90, category: 'Coding' },
+        { text: 'Project Development & System Design', estimatedMinutes: 75, category: 'Project' },
+        { text: 'Scheduled Relaxation & Evening Leisure', estimatedMinutes: 60, category: 'Personal' },
+      ],
+      totalEstimatedMinutes: 225,
+      priority: 'High',
+      reasoning: 'Holiday schedule provides balanced time for skill building and rest.',
+    };
+  }
+
+  // Default College Day recommendation logic
   const isWeekend = currentDay === 'Sunday' || currentDay === 'Saturday';
 
   if (isWeekend) {
@@ -833,3 +1350,221 @@ export function getDailyMissionTasks(): DailyMissionTask[] {
 export function saveDailyMissionTasks(tasks: DailyMissionTask[]) {
   localStorage.setItem(STORAGE_KEYS.TODAYS_FOCUS, JSON.stringify(tasks));
 }
+
+export interface NextBestAction {
+  actionTitle: string;
+  actionDetails: string;
+  category: 'class' | 'lab' | 'library' | 'study' | 'meal' | 'commute' | 'routine' | 'rest' | 'break';
+  timeWindow: string;
+  reasons: string[];
+  isLectureHeavy?: boolean;
+}
+
+export function getNextBestAction(
+  dayName?: string,
+  modeOverride?: DayMode,
+  currentMinsOverride?: number
+): NextBestAction {
+  const currentDay = dayName || getTodayDayName();
+  const dayMode = modeOverride || getStoredDayMode();
+  const priority = getStoredDailyPriority();
+  const schedPrefs = getStoredSchedulingPreferences();
+
+  const now = new Date();
+  const currentMins =
+    currentMinsOverride !== undefined
+      ? currentMinsOverride
+      : now.getHours() * 60 + now.getMinutes();
+
+  const wakeupMins = timeToMinutes(schedPrefs.preferredWakeupTime || '07:15');
+  const bedtimeMins = timeToMinutes(schedPrefs.preferredBedtime || '23:30');
+  const lunchStart = timeToMinutes(schedPrefs.lunchStartTime || '12:30');
+  const lunchEnd = timeToMinutes(schedPrefs.lunchEndTime || '13:30');
+  const dinnerStart = timeToMinutes(schedPrefs.dinnerStartTime || '20:00');
+  const dinnerEnd = timeToMinutes(schedPrefs.dinnerEndTime || '21:00');
+  const commuteMins = schedPrefs.commuteDurationMinutes || 45;
+
+  const rawSlots = getStoredTimetable()[currentDay] || DEFAULT_TIMETABLE[currentDay] || [];
+  const sortedSlots = [...rawSlots].sort(
+    (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+  );
+
+  // 1. SLEEP WINDOW
+  if (currentMins < wakeupMins || currentMins >= bedtimeMins - 15) {
+    return {
+      actionTitle: 'Sleep & Night Recovery',
+      actionDetails: `Target wakeup at ${minsTo24h(wakeupMins)}. Prioritize full rest & memory consolidation.`,
+      category: 'rest',
+      timeWindow: `${minsTo24h(currentMins)} – ${minsTo24h(wakeupMins)}`,
+      reasons: [
+        'Priority 1 in scheduling engine: Sleep & Recovery',
+        'Essential for cognitive focus and problem-solving retention',
+      ],
+    };
+  }
+
+  // 2. MORNING ROUTINE
+  if (currentMins >= wakeupMins && currentMins < wakeupMins + 30) {
+    return {
+      actionTitle: 'Morning Routine & Breakfast',
+      actionDetails: `Hydrate & prepare for ${dayMode}. Today's Focus Priority: ${priority}`,
+      category: 'routine',
+      timeWindow: `${minsTo24h(wakeupMins)} – ${minsTo24h(wakeupMins + 30)}`,
+      reasons: [
+        'Priority 2 in scheduling engine: Morning Routine',
+        `Prepares mind and body for today's ${priority} targets`,
+      ],
+    };
+  }
+
+  // 3. MEALS
+  if (currentMins >= lunchStart && currentMins < lunchEnd) {
+    return {
+      actionTitle: 'Eat Lunch & Recharge',
+      actionDetails: 'Nutritious lunch break with zero academic pressure',
+      category: 'meal',
+      timeWindow: `${minsTo24h(lunchStart)} – ${minsTo24h(lunchEnd)}`,
+      reasons: [
+        'Priority 6 in scheduling engine: Meals',
+        'Restores blood glucose and mental energy for afternoon sessions',
+      ],
+    };
+  }
+
+  if (currentMins >= dinnerStart && currentMins < dinnerEnd) {
+    return {
+      actionTitle: 'Eat Dinner & Relaxation',
+      actionDetails: 'Relaxing dinner window before evening focus session',
+      category: 'meal',
+      timeWindow: `${minsTo24h(dinnerStart)} – ${minsTo24h(dinnerEnd)}`,
+      reasons: [
+        'Priority 6 in scheduling engine: Meals',
+        'Protects personal time and work-life balance',
+      ],
+    };
+  }
+
+  // 4. SICK LEAVE MODE
+  if (dayMode === 'Sick Leave') {
+    return {
+      actionTitle: 'Rest & Recover (Sick Leave)',
+      actionDetails: 'All heavy coding sessions paused. Hydrate & rest.',
+      category: 'rest',
+      timeWindow: 'All Day',
+      reasons: ['Sick Leave active', 'Prioritizes physical health recovery'],
+    };
+  }
+
+  // 5. COLLEGE DAY MODE
+  if (dayMode === 'College Day' && sortedSlots.length > 0) {
+    const firstClassStart = timeToMinutes(sortedSlots[0].startTime);
+    const lastClassEnd = timeToMinutes(sortedSlots[sortedSlots.length - 1].endTime);
+    const morningCommuteStart = Math.max(0, firstClassStart - commuteMins);
+    const eveningCommuteEnd = Math.min(1440, lastClassEnd + commuteMins);
+
+    // Morning Commute
+    if (currentMins >= morningCommuteStart && currentMins < firstClassStart) {
+      return {
+        actionTitle: 'Commute to College',
+        actionDetails: `Heading to campus for ${sortedSlots[0].subjectId} (${sortedSlots[0].startTime})`,
+        category: 'commute',
+        timeWindow: `${minsTo24h(morningCommuteStart)} – ${minsTo24h(firstClassStart)}`,
+        reasons: [
+          'Priority 3 in scheduling engine: Campus Commute',
+          `Arrive early for ${sortedSlots[0].subjectId} class`,
+        ],
+      };
+    }
+
+    // Evening Commute
+    if (currentMins >= lastClassEnd && currentMins < eveningCommuteEnd) {
+      return {
+        actionTitle: 'Travel Home from College',
+        actionDetails: 'Evening commute back home after campus lectures & labs',
+        category: 'commute',
+        timeWindow: `${minsTo24h(lastClassEnd)} – ${minsTo24h(eveningCommuteEnd)}`,
+        reasons: [
+          'Priority 3 in scheduling engine: Campus Commute',
+          'Decompress during travel',
+        ],
+      };
+    }
+
+    // Inside Class or Lab
+    const currentSlot = sortedSlots.find(
+      (s) => currentMins >= timeToMinutes(s.startTime) && currentMins < timeToMinutes(s.endTime)
+    );
+
+    if (currentSlot) {
+      const isLab = currentSlot.type === 'lab';
+      return {
+        actionTitle: `Attend ${currentSlot.subjectId} ${isLab ? 'Lab' : 'Lecture'}`,
+        actionDetails: `Room ${currentSlot.room || 'Classroom'} • ${isLab ? 'Mandatory Lab (Priority 5)' : 'Lecture (Priority 4)'}`,
+        category: isLab ? 'lab' : 'class',
+        timeWindow: `${currentSlot.startTime} – ${currentSlot.endTime}`,
+        reasons: [
+          isLab ? 'Mandatory lab attendance protected' : 'Subject attendance target ≥80%',
+          'Engage actively in lecture concepts',
+        ],
+      };
+    }
+
+    // Break / Gap inside College
+    if (currentMins >= firstClassStart && currentMins < lastClassEnd) {
+      const nextClass = sortedSlots.find((s) => timeToMinutes(s.startTime) > currentMins);
+
+      return {
+        actionTitle: 'College in Session (Lectures & Labs)',
+        actionDetails: nextClass
+          ? `Attending campus classes (Next: ${nextClass.subjectId} at ${nextClass.startTime}). Deep work begins after returning home.`
+          : `Attending college until ${minsTo24h(lastClassEnd)}. Deep work begins after returning home.`,
+        category: 'class',
+        timeWindow: `${minsTo24h(currentMins)} – ${minsTo24h(lastClassEnd)}`,
+        isLectureHeavy: true,
+        reasons: [
+          'College hours protected — zero study blocks generated during college lectures',
+          'Focus on attending classes & mandatory labs',
+          `Deep Work Block 1 (${priority}) starts upon returning home`,
+        ],
+      };
+    }
+
+    // Evening at home (after college commute)
+    if (currentMins >= eveningCommuteEnd && currentMins < dinnerStart) {
+      let topic = 'Evening LeetCode Sprint';
+      if (priority === 'AuraLife Development') topic = 'AuraLife Feature Development';
+      else if (priority === 'College Revision') topic = 'Tomorrow\'s Subject Revision & Lab Prep';
+      else if (priority === 'DSA') topic = 'A2Z Sheet Algorithm Sprint';
+
+      return {
+        actionTitle: `Start Evening Focus: ${topic}`,
+        actionDetails: `Home deep work session on ${priority}`,
+        category: 'study',
+        timeWindow: `${minsTo24h(currentMins)} – ${minsTo24h(dinnerStart)}`,
+        reasons: [
+          'Evening study session (Priority 8)',
+          'Zero commute pressure • Full focus environment',
+          `Completes daily ${priority} target`,
+        ],
+      };
+    }
+  }
+
+  // 6. DEFAULT FOCUS ACTION
+  let topic = 'DSA & LeetCode Sprint';
+  if (priority === 'AuraLife Development') topic = 'AuraLife Feature Development';
+  else if (priority === 'College Revision') topic = 'College Subject Revision';
+
+  return {
+    actionTitle: `Start Focus Session: ${topic}`,
+    actionDetails: `Uninterrupted deep work block • Priority: ${priority}`,
+    category: 'study',
+    timeWindow: `${minsTo24h(currentMins)} – ${minsTo24h(Math.min(bedtimeMins, currentMins + 90))}`,
+    reasons: [
+      `Optimized for ${dayMode}`,
+      `Aligned with today's priority: ${priority}`,
+      'No conflicts with meals or sleep schedule',
+    ],
+  };
+}
+

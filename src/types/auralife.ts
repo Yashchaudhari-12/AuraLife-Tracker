@@ -65,6 +65,7 @@ export interface FreeWindow {
   windowType?: 'morning' | 'midday' | 'evening' | 'offday';
   dsaRepoSync?: string;
   leetcodeSync?: string;
+  reasons?: string[];
 }
 
 export interface AiRecommendation {

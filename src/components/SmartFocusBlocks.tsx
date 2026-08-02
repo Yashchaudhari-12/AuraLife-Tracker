@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plus, Check, Trash2, Sparkles, Clock, Edit3, X, Save } from 'lucide-react';
+import { Plus, Check, Trash2, Sparkles, Clock, Edit3, X, Save, Info } from 'lucide-react';
 import { TimeBlock } from '../plannerStorage';
+import {
+  getScheduleSlotsForDay,
+  getTodayDayName,
+  detectFreeWindows,
+} from '../utils/auralifeData';
+import { getStoredSchedulingPreferences } from '../utils/schedulingIntelligence';
+import { FreeWindow } from '../types/auralife';
 
 interface SmartFocusBlocksProps {
   blocks: TimeBlock[];
@@ -21,48 +28,16 @@ interface SmartFocusBlocksProps {
   onDeleteBlock: (id: string) => void;
 }
 
-const AI_SUGGESTED_BLOCKS = [
-  {
-    id: 'sug-morning',
-    title: 'Morning Focus: DSA & Concept Practice',
-    durationMinutes: 90,
-    category: 'DSA',
-    difficulty: 'Hard' as const,
-    startTime: '06:45',
-    endTime: '08:15',
-    subtasks: ['06:00 Wakeup -> 45m Shower/Brush', '06:45-08:15 Deep Focus', '08:15 Commute'],
-  },
-  {
-    id: 'sug-1',
-    title: 'Solve Dutch National Flag & Review Kadane',
-    durationMinutes: 90,
-    category: 'DSA',
-    difficulty: 'Medium' as const,
-    startTime: '17:30',
-    endTime: '19:00',
-    subtasks: ['Sort Colors (LeetCode 75)', 'Maximum Subarray Variant'],
-  },
-  {
-    id: 'sug-2',
-    title: 'A2Z Sheet: Sliding Window & Two Pointers',
-    durationMinutes: 60,
-    category: 'Coding',
-    difficulty: 'Medium' as const,
-    startTime: '19:30',
-    endTime: '20:30',
-    subtasks: ['Longest Substring Without Repeating Chars', 'Fruit Into Baskets'],
-  },
-  {
-    id: 'sug-3',
-    title: 'COA & OOP Class Notes Revision Sprint',
-    durationMinutes: 45,
-    category: 'College',
-    difficulty: 'Easy' as const,
-    startTime: '21:00',
-    endTime: '21:45',
-    subtasks: ['Pipeline Hazards Review', 'Virtual Functions & Polymorphism'],
-  },
-];
+interface SuggestedFocusBlock {
+  id: string;
+  title: string;
+  durationMinutes: number;
+  category: string;
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+  startTime: string;
+  endTime: string;
+  reasons: string[];
+}
 
 export function SmartFocusBlocks({
   blocks,
@@ -71,11 +46,16 @@ export function SmartFocusBlocks({
   onToggleBlock,
   onDeleteBlock,
 }: SmartFocusBlocksProps) {
+  const currentDay = getTodayDayName();
+  const [prefs, setPrefs] = useState(() => getStoredSchedulingPreferences());
+  const [suggestedBlocks, setSuggestedBlocks] = useState<SuggestedFocusBlock[]>([]);
+
+  // Form states
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState(90);
   const [category, setCategory] = useState('Focus');
-  const [startTime, setStartTime] = useState('06:45');
-  const [endTime, setEndTime] = useState('08:15');
+  const [startTime, setStartTime] = useState(prefs.preferredWakeupTime || '07:15');
+  const [endTime, setEndTime] = useState('08:45');
   const [addedSugIds, setAddedSugIds] = useState<Record<string, boolean>>({});
 
   // Editing state
@@ -85,6 +65,64 @@ export function SmartFocusBlocks({
   const [editCategory, setEditCategory] = useState('');
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
+
+  const generateDynamicSuggestions = () => {
+    const currentPrefs = getStoredSchedulingPreferences();
+    setPrefs(currentPrefs);
+
+    const slots = getScheduleSlotsForDay(currentDay);
+    const freeWins = detectFreeWindows(slots, currentDay);
+
+    // Filter out windows that overlap with existing blocks or violate morning setting
+    const validWins = freeWins.filter((win) => {
+      // RULE 5: If morning study is disabled, skip any block starting before 09:00 AM
+      const startMins = parseInt(win.startTime.split(':')[0], 10) * 60 + parseInt(win.startTime.split(':')[1], 10);
+      if (!currentPrefs.morningDeepWorkEnabled && startMins < 9 * 60) {
+        return false;
+      }
+
+      // Skip if already added to blocks list
+      const existsInBlocks = blocks.some((b) => b.startTime === win.startTime && b.endTime === win.endTime);
+      return !existsInBlocks;
+    });
+
+    const maxAllowed = currentPrefs.maxFocusBlocksPerDay || 3;
+    const items: SuggestedFocusBlock[] = validWins.slice(0, maxAllowed).map((win, idx) => {
+      const topics = [
+        'A2Z DSA Sheet: LeetCode & Kadane Review',
+        'Daily Problem Solving & Sliding Window Sprint',
+        'College Subjects & Revision Session',
+        'System Architecture & Core Project Work',
+      ];
+
+      const topicTitle = topics[idx % topics.length];
+
+      return {
+        id: `dyn-sug-${currentDay}-${win.startTime}-${win.endTime}`,
+        title: topicTitle,
+        durationMinutes: win.durationMinutes,
+        category: idx % 2 === 0 ? 'DSA' : 'Coding',
+        difficulty: win.durationMinutes >= 90 ? 'Hard' : 'Medium',
+        startTime: win.startTime,
+        endTime: win.endTime,
+        reasons: win.reasons || [
+          `${win.durationMinutes}-minute uninterrupted window on ${currentDay}`,
+          `Fits your preferred study duration (${currentPrefs.preferredDeepWorkDuration || 90}m)`,
+          `No conflict with meals or sleep schedule (${currentPrefs.preferredWakeupTime} to ${currentPrefs.preferredBedtime})`,
+          `Completes today's DSA & LeetCode target`,
+        ],
+      };
+    });
+
+    setSuggestedBlocks(items);
+  };
+
+  useEffect(() => {
+    generateDynamicSuggestions();
+    const handleUpdate = () => generateDynamicSuggestions();
+    window.addEventListener('auralife_schedule_updated', handleUpdate);
+    return () => window.removeEventListener('auralife_schedule_updated', handleUpdate);
+  }, [blocks]);
 
   const handleCustomAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +140,7 @@ export function SmartFocusBlocks({
     setCategory('Focus');
   };
 
-  const handleAddSuggested = (sug: (typeof AI_SUGGESTED_BLOCKS)[0]) => {
+  const handleAddSuggested = (sug: SuggestedFocusBlock) => {
     onAddBlock(sug.title, sug.durationMinutes, sug.category, sug.difficulty, sug.startTime, sug.endTime);
     setAddedSugIds((prev) => ({ ...prev, [sug.id]: true }));
   };
@@ -137,73 +175,92 @@ export function SmartFocusBlocks({
         </p>
         <h2 className="text-2xl font-bold text-white">Focus Blocks Engine</h2>
         <p className="mt-1 text-xs text-slate-400">
-          Structured deep work sessions aligned to your goals and class breaks.
+          Personalized deep work sessions strictly calculated from your timetable, wake-up time ({prefs.preferredWakeupTime}), and bedtime ({prefs.preferredBedtime}).
         </p>
       </div>
 
-      {/* AI Suggested Focus Blocks Carousel / Grid */}
+      {/* AI Suggested Focus Blocks Grid */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-violet-400" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-violet-300">
-            Suggested Focus Blocks
-          </h3>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-violet-400" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-violet-300">
+              Suggested Focus Blocks ({suggestedBlocks.length})
+            </h3>
+          </div>
+          <span className="text-[11px] text-slate-400 font-mono">
+            Max {prefs.maxFocusBlocksPerDay || 3} Blocks / Day • Morning Study: {prefs.morningDeepWorkEnabled ? 'Enabled' : 'Disabled'}
+          </span>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {AI_SUGGESTED_BLOCKS.map((sug) => {
-            const isAdded = addedSugIds[sug.id];
-            return (
-              <div
-                key={sug.id}
-                className="flex flex-col justify-between rounded-2xl border border-violet-500/20 bg-slate-900/80 p-3.5 transition hover:border-violet-400/40"
-              >
-                <div>
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
-                    <span className="rounded-md bg-violet-500/20 px-2 py-0.5 text-violet-300">
-                      {sug.category}
-                    </span>
-                    <span className="text-cyan-300 font-mono font-bold">{sug.startTime}–{sug.endTime}</span>
+        {suggestedBlocks.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {suggestedBlocks.map((sug) => {
+              const isAdded = addedSugIds[sug.id];
+              return (
+                <div
+                  key={sug.id}
+                  className="flex flex-col justify-between rounded-2xl border border-violet-500/20 bg-slate-900/90 p-4 transition hover:border-violet-400/40 space-y-3"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
+                      <span className="rounded-md bg-violet-500/20 border border-violet-500/30 px-2.5 py-0.5 text-violet-300 font-bold">
+                        {sug.category}
+                      </span>
+                      <span className="text-cyan-300 font-mono font-bold bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded">
+                        {sug.startTime}–{sug.endTime}
+                      </span>
+                    </div>
+
+                    <h4 className="mt-2.5 text-sm font-bold text-white leading-snug">{sug.title}</h4>
+
+                    {/* Reasoning Bullet Points */}
+                    <div className="mt-3 pt-2.5 border-t border-white/5 space-y-1">
+                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-cyan-400">
+                        Recommended because:
+                      </p>
+                      <ul className="space-y-1 text-[11px] text-slate-300">
+                        {sug.reasons.map((reason, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                            <span>{reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
 
-                  <h4 className="mt-2 text-xs font-bold text-white leading-snug">{sug.title}</h4>
-
-                  <ul className="mt-2 space-y-1 text-[10px] text-slate-400">
-                    {sug.subtasks.map((st, i) => (
-                      <li key={i} className="flex items-center gap-1">
-                        <span className="h-1 w-1 rounded-full bg-cyan-400 shrink-0" />
-                        <span>{st}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAddSuggested(sug)}
+                      disabled={isAdded}
+                      className={`w-full rounded-xl py-2 px-3 text-xs font-extrabold transition flex items-center justify-center gap-1.5 ${
+                        isAdded
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:opacity-95 shadow-md'
+                      }`}
+                    >
+                      {isAdded ? (
+                        <>
+                          <Check className="h-4 w-4 text-emerald-400" /> Added to Today's Planner
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4" /> Add Focus Block
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-
-                <div className="mt-3 border-t border-white/5 pt-2.5">
-                  <button
-                    type="button"
-                    onClick={() => handleAddSuggested(sug)}
-                    disabled={isAdded}
-                    className={`w-full rounded-xl py-1.5 px-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                      isAdded
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : 'bg-violet-600 text-white hover:bg-violet-500 shadow-md'
-                    }`}
-                  >
-                    {isAdded ? (
-                      <>
-                        <Check className="h-3.5 w-3.5 text-emerald-400" /> Added to Today
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-3.5 w-3.5" /> Add to Today
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs text-slate-400">
+            No additional focus block suggestions available based on your active timetable and sleep settings.
+          </div>
+        )}
       </div>
 
       {/* Form: Custom Focus Block */}
@@ -219,21 +276,21 @@ export function SmartFocusBlocks({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Title (e.g. Morning DSA Sprint)"
+            placeholder="Title (e.g. DSA Revision Sprint)"
             className="rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-cyan-400 lg:col-span-2"
           />
           <input
             type="text"
             value={startTime}
             onChange={(e) => setStartTime(e.target.value)}
-            placeholder="Start (e.g. 06:45)"
+            placeholder={`Start (${prefs.preferredWakeupTime})`}
             className="rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-cyan-400 font-mono"
           />
           <input
             type="text"
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
-            placeholder="End (e.g. 08:15)"
+            placeholder="End (e.g. 19:30)"
             className="rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-cyan-400 font-mono"
           />
           <input
@@ -244,8 +301,11 @@ export function SmartFocusBlocks({
             className="rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-cyan-400"
           />
         </div>
-        <div className="flex justify-between items-center text-[11px] text-slate-400">
-          <span>Tip: Default morning focus block runs 06:45–08:15 AM after 06:00 AM wakeup routine.</span>
+        <div className="flex justify-between items-center text-[11px] text-slate-400 flex-wrap gap-2">
+          <span className="flex items-center gap-1.5 text-slate-400">
+            <Info className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+            <span>Times align with wake-up ({prefs.preferredWakeupTime}) and bedtime ({prefs.preferredBedtime}).</span>
+          </span>
           <button
             type="submit"
             className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-5 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-400"
@@ -297,14 +357,14 @@ export function SmartFocusBlocks({
                           type="text"
                           value={editStart}
                           onChange={(e) => setEditStart(e.target.value)}
-                          placeholder="Start Time (06:45)"
+                          placeholder="Start Time"
                           className="rounded-xl border border-white/10 bg-slate-950 p-2 text-xs text-white outline-none focus:border-cyan-400 font-mono"
                         />
                         <input
                           type="text"
                           value={editEnd}
                           onChange={(e) => setEditEnd(e.target.value)}
-                          placeholder="End Time (08:15)"
+                          placeholder="End Time"
                           className="rounded-xl border border-white/10 bg-slate-950 p-2 text-xs text-white outline-none focus:border-cyan-400 font-mono"
                         />
                         <input
